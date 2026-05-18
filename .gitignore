@@ -12,7 +12,6 @@ venv/
 
 # Jupyter and notebooks
 .ipynb_checkpoints/
-notebooks
 
 # Data
 data/*
