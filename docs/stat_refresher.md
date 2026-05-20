@@ -92,7 +92,85 @@ In practice, KPSS complements the ADF test and helps validate assumptions requir
 
 ---
 
-## Autocorrelation and Partial autocorrelation 
+## Autocorrelation 
 
-Autocorrelation measures the linear relationship between *lagged* values, meaning between $y_{t}$ and $y_{t - k}$. These are important, 
-as autocorrelation measures how future data is linearly correlated to past data with lag *k*. 
+Autocorrelation measures the linear relationship between lagged values of a time series, namely between $y_t$ and $y_{t-k}$.
+
+In other words, it quantifies how strongly past observations influence future observations at a given lag $k$.
+
+The autocorrelation of a time series $y$ at lag $k$ is defined as:
+
+$$
+\frac{
+\sum_{t = k + 1}^{T}
+(y_{t-k} - \bar{y})(y_t - \bar{y})
+}{
+\sum_{t = 1}^{T}
+(y_t - \bar{y})^2
+}
+$$
+
+In time series forecasting, autocorrelation is an important diagnostic tool that helps identify:
+- seasonality,
+- persistence,
+- trend-related temporal dependence,
+- decay patterns.
+
+Seasonality can often be identified from the ACF plot when:
+- significant spikes appear at regular lags,
+- especially at multiples of a seasonal period $T$.
+
+For example:
+- daily data with weekly seasonality often shows spikes at lags 7, 14, 21, ...
+
+A slowly decaying ACF instead is often associated with trend or non-stationarity.
+
+---
+
+### Autocorrelation Function (ACF)
+
+The *Autocorrelation Function* (ACF) measures the autocorrelation of a time series across multiple lags.
+
+An ACF plot typically has:
+- x-axis: lag values,
+- y-axis: autocorrelation coefficient.
+
+Interpretation:
+- periodic spikes often indicate seasonality;
+- slow decay often indicates trend or non-stationarity;
+- values close to zero indicate weak temporal dependence.
+
+The ACF is commonly used in:
+- exploratory data analysis,
+- seasonality detection,
+- ARIMA diagnostics.
+
+---
+## Partial autocorrelation
+
+Partial autocorrelation measures the direct relationship between $y_t$ and $y_{t-k}$ after removing the effect of intermediate lags.
+
+While autocorrelation includes both:
+- direct effects,
+- indirect effects propagated through intermediate lags,
+
+partial autocorrelation isolates only the direct contribution of lag $k$.
+
+---
+
+### Partial Autocorrelation Function (PACF)
+
+The *Partial Autocorrelation Function* (PACF) measures partial autocorrelation across multiple lags.
+
+A PACF plot is particularly useful for identifying:
+- important direct lag dependencies,
+- autoregressive structure,
+- the order $p$ in ARIMA models.
+
+Interpretation:
+- strong spikes at early lags indicate direct temporal dependence;
+- a sharp cutoff after lag $p$ often suggests an AR($p$) process.
+
+In practice:
+- ACF is mainly used to analyze overall temporal structure and seasonality;
+- PACF is mainly used to identify direct lag effects in autoregressive models.
