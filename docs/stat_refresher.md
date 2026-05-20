@@ -1,9 +1,9 @@
-## Statistics refresher
+# Statistics refresher
 
 Collection of useful statistics concepts that might be useful to understand the models and techniques employed in this package.
 
 ----
-### Hypothesis testing
+## Hypothesis testing
 
 Hypothesis testing is a statistical technique employed to gain evidence from available data that a specific hypothesis (the *null hypothesis*) is true, unless the data suggests it is not (hence, we accept the *alternative hypothesis*).
 
@@ -89,3 +89,10 @@ The test may fail or become unstable in the presence of:
 - structural breaks.
 
 In practice, KPSS complements the ADF test and helps validate assumptions required by statistical forecasting models.
+
+---
+
+## Autocorrelation and Partial autocorrelation 
+
+Autocorrelation measures the linear relationship between *lagged* values, meaning between $y_{t}$ and $y_{t - k}$. These are important, 
+as autocorrelation measures how future data is linearly correlated to past data with lag *k*. 
