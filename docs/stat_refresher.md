@@ -174,3 +174,146 @@ Interpretation:
 In practice:
 - ACF is mainly used to analyze overall temporal structure and seasonality;
 - PACF is mainly used to identify direct lag effects in autoregressive models.
+
+---
+
+## Decomposition Plots
+
+Decomposition plots are diagnostic tools used to separate a time series into its main components:
+
+```text
+Observed Series
+=
+Trend
++ Seasonal Component
++ Residual Noise
+```
+
+or, for multiplicative models:
+
+```text
+Observed Series
+=
+Trend × Seasonal Component × Residual Noise
+```
+
+A decomposition plot typically contains:
+- observed series,
+- trend,
+- seasonality,
+- residuals.
+
+These plots help identify:
+- long-term trends,
+- seasonal patterns,
+- remaining unexplained noise.
+
+---
+
+### Additive vs Multiplicative Models
+
+#### Additive decomposition
+
+Assumes constant seasonal fluctuations:
+
+```text
+series = trend + seasonality + residual
+```
+
+Preferred when:
+- variance is approximately constant,
+- seasonal amplitude remains stable over time.
+
+---
+
+#### Multiplicative decomposition
+
+Assumes seasonal fluctuations scale with the series level:
+
+```text
+series = trend × seasonality × residual
+```
+
+Preferred when:
+- variance increases with the trend,
+- seasonal oscillations become larger over time.
+
+---
+
+### Seasonal Period Selection
+
+The seasonal period is usually inferred through:
+- domain knowledge,
+- ACF/PACF analysis,
+- visual inspection.
+
+Example:
+- daily data with weekly seasonality often uses:
+
+```python
+period = 7
+```
+
+Periodic ACF spikes at:
+- 7,
+- 14,
+- 21,
+- ...
+
+often suggest weekly seasonality.
+
+---
+
+## Residual Analysis
+
+Residuals represent the unexplained component of the model:
+
+```text
+residual = observed - predicted
+```
+
+Ideally, residuals should resemble:
+- white noise,
+- zero-centered random fluctuations,
+- no remaining temporal structure.
+
+---
+
+### Residual Histogram
+
+Used to visually inspect:
+- symmetry,
+- skewness,
+- approximate Gaussian shape.
+
+Ideally:
+- residuals should be centered around zero,
+- distribution should appear roughly bell-shaped.
+
+---
+
+### QQ Plot
+
+A QQ plot compares residual quantiles against a theoretical Gaussian distribution.
+
+Interpretation:
+- points close to the diagonal line suggest approximate normality;
+- large deviations suggest skewness or heavy tails.
+
+---
+
+### Residual Autocorrelation
+
+Residual ACF plots verify whether temporal structure remains after modeling.
+
+Ideally:
+- most autocorrelations should lie within confidence bands.
+
+Strong residual autocorrelation may indicate that:
+- trend,
+- seasonality,
+- or other temporal dependencies
+
+were not fully captured by the model.
+
+In practice, approximate white-noise residuals are usually more important than perfect Gaussianity.
