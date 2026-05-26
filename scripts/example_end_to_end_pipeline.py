@@ -21,7 +21,7 @@ import logging
 from data.ingestion import Reader
 from data.processing.data_processor import DataProcessor
 
-from forecasting.models.arima_forecaster import ARIMAForecaster
+from forecasting.models.sarimax_forecaster import ARIMAForecaster
 from forecasting.models.ets_forecaster import ETSForecaster
 from forecasting.models.naive_forecaster import NaiveForecaster
 from forecasting.models.rolling_window_forecaster import RollingWindowForecaster

@@ -90,3 +90,46 @@ class ForecastExtractor:
         return forecast_df.group_by("destination_id").agg(
             pl.col("forecast").mean().alias("demand")
         )
+
+    @staticmethod
+    def extract_demand_time_series(
+        results_df: pl.DataFrame,
+        forecast_col: str,
+    ) -> pl.DataFrame:
+        """Return a DataFrame with schema [destination_id, date, demand].
+
+        Preserves per-date granularity — one row per destination per date.
+        The forecast column is renamed to 'demand'.
+
+        Parameters
+        ----------
+        results_df : pl.DataFrame
+            Full forecasting results containing at least ``date``,
+            ``destination_id``, and the column named *forecast_col*.
+        forecast_col : str
+            Name of the column holding the forecast values to use as demand.
+
+        Returns
+        -------
+        pl.DataFrame
+            A three-column DataFrame with schema
+            ``[destination_id: Utf8, date: Date, demand: Float64]``.
+
+        Raises
+        ------
+        ValueError
+            If any of the required columns are missing from *results_df*.
+        """
+        required = {"date", "destination_id", forecast_col}
+        missing = sorted(required - set(results_df.columns))
+        if missing:
+            raise ValueError(
+                f"Missing required columns: {missing}. "
+                f"Available columns: {results_df.columns}"
+            )
+
+        return results_df.select(
+            pl.col("destination_id").cast(pl.Utf8),
+            pl.col("date").cast(pl.Date),
+            pl.col(forecast_col).cast(pl.Float64).alias("demand"),
+        )
