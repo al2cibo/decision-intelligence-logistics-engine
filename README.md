@@ -125,16 +125,19 @@ The key difference: single-period treats each day independently (myopic), while 
 ## Core Components
 
 ### 1. Data Layer
-- Synthetic logistics data generation
-- Data processing with Polars
+- Synthetic logistics data generation (dedicated `scripts/synthetic_data.py` module)
+- Data processing with Polars via module-level validation functions
 - Efficient storage in Parquet format
+- Explicit `__all__` exports in all packages
 
 ### 2. Forecasting Layer
 - **Per-destination model training** — one model per destination, independently selected
 - **Model Registry** — factory pattern for dynamic model instantiation
+- **Unified ModelSelector** — single implementation supporting both DataFrame and tuple-list inputs, with NaN handling and first-in-order tiebreaking
 - **Supported models**: Naive, Seasonal Naive, Rolling Window (Moving Average), ETS, ARIMA/SARIMAX
-- **Evaluation**: WAPE, MAE, RMSE, MAPE, MSE per destination per model
+- **Evaluation**: WAPE, MAE, RMSE, MAPE, MSE per destination per model (pure, side-effect-free)
 - **Model selection**: automatic best-model selection per destination by configurable metric
+- **Pipeline Protocol**: `PipelineProtocol` (structural subtyping) — both `ForecastingPipeline` and `PerDestinationPipeline` conform
 - **Parallel execution**: joblib-based parallelism across destinations (configurable workers)
 - **Fault tolerance**: individual destination failures don't block the pipeline
 - **Reproducibility**: deterministic results regardless of row ordering or parallelism level
@@ -144,18 +147,21 @@ The key difference: single-period treats each day independently (myopic), while 
 - **Single-period**: minimum-cost transportation LP — allocate supply to meet demand now
 - **Multi-period**: joint optimization over a planning horizon with inventory tracking and holding costs
 - Unified `OptimizerInterface` dispatches to the appropriate solver mode
+- **Shared validation module** (`optimization.validation`) — common checks used by both optimizers
 - OR-Tools backend (GLOP for LP, CBC for MIP)
 - Capacity-constrained origin-to-destination flow assignment
-- Pre-solve feasibility checks (unreachable destinations, insufficient capacity)
+- Pre-solve feasibility checks (unreachable destinations, insufficient capacity, negative costs, non-positive capacities)
 - Integration of forecast-derived demand into downstream optimization
 
-### 4. Simulation Layer *(planned)*
-- Event-driven simulation of shipment arrivals, delays, and processing
+### 4. Simulation Layer *(interface defined)*
+- `SimulationInterface` ABC with `SimulationResult` dataclass
+- Ready for event-driven simulation of shipment arrivals, delays, and processing
 - Stochastic demand generation
 - Scenario analysis under uncertainty
 
-### 5. Serving Layer *(planned)*
-- FastAPI endpoints for simulation, forecasting, and optimization
+### 5. Serving Layer *(interface defined)*
+- `APIInterface` ABC with `forecast` and `optimize` abstract methods
+- Ready for FastAPI endpoints for simulation, forecasting, and optimization
 
 ---
 
@@ -219,6 +225,9 @@ Each destination independently selects the model best suited to its demand patte
 - **Row-order independence** — results are deterministic regardless of input ordering
 - **Fault tolerance** — one destination's failure doesn't block others
 - **Open-closed architecture** — add new models (LightGBM, Prophet, DeepAR) without modifying pipeline code
+- **Composition over inheritance** — module-level functions and protocols over deep class hierarchies
+- **Explicit contracts** — `Protocol`, `ABC`, and `__all__` declare what is public
+- **Pure functions where possible** — no hidden state mutation during computation
 - **Property-based testing** — 13 formal correctness properties verified with Hypothesis
 
 ---
@@ -229,7 +238,7 @@ The project uses **pytest** with **Hypothesis** for property-based testing:
 
 ```bash
 python -m pytest tests/ -v
-# 182 passed
+# 188 passed
 ```
 
 Key correctness properties verified:
@@ -239,18 +248,20 @@ Key correctness properties verified:
 - Model selection minimality with tiebreaking
 - Fault tolerance completeness
 - Determinism across executions
+- Pipeline protocol conformance
 
 ---
 
 ## Planned Features
 
-- [ ] FastAPI endpoints for end-to-end execution
+- [ ] FastAPI endpoints for end-to-end execution (interface defined via `APIInterface`)
+- [ ] Stochastic simulation layer implementation (interface defined via `SimulationInterface`)
 - [ ] MLflow experiment tracking
 - [ ] Docker support
-- [ ] Stochastic simulation layer (SimPy)
 - [ ] ML model integration (LightGBM, XGBoost, Prophet)
 - [ ] Hierarchical forecasting
 - [ ] Performance benchmarking
+- [ ] Visualization config support (show/save via YAML)
 
 ---
 
