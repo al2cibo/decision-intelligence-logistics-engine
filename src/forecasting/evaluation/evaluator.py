@@ -1,7 +1,10 @@
+"""Forecasting accuracy metrics computation.
+
+Computes MAE, MSE, RMSE, MAPE, and WAPE given a DataFrame with
+target and forecast columns.
 """
-Main evaluator class, computing main forecasting accuracy metrics given a dataframe and the names of the
-target column and the forecast column.
-"""
+
+import logging
 
 import numpy as np
 import polars as pl
@@ -11,6 +14,8 @@ from sklearn.metrics import (
     mean_absolute_percentage_error,
     root_mean_squared_error,
 )
+
+logger = logging.getLogger(__name__)
 
 
 class Evaluator:
@@ -54,6 +59,10 @@ class Evaluator:
 
         filtered_df = df.drop_nulls(subset=[forecast_col_name])
         if original_length != filtered_df.height:
-            print("Null values found and removed.")
+            logger.warning(
+                "Removed %d null values from '%s' column before evaluation.",
+                original_length - filtered_df.height,
+                forecast_col_name,
+            )
 
         return filtered_df
