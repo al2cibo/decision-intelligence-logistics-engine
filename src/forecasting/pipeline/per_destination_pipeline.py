@@ -107,13 +107,15 @@ class PerDestinationPipeline:
         self.model_params = model_params or {}
         self._selector = PerDestinationModelSelector(metric=selection_metric)
 
-    def run(self, df: pl.DataFrame) -> AggregatedPipelineResult:
+    def run(self, df: pl.DataFrame, **kwargs: Any) -> AggregatedPipelineResult:
         """Execute the per-destination pipeline.
 
         Parameters
         ----------
         df : pl.DataFrame
             Input DataFrame with columns: date, destination_id, demand.
+        **kwargs : Any
+            Additional keyword arguments (reserved for future use).
 
         Returns
         -------

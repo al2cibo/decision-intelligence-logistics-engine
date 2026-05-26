@@ -1,7 +1,8 @@
 """Per-destination model selection for choosing the best forecasting model."""
 
-import math
 from dataclasses import dataclass
+
+from forecasting.evaluation.model_selector import ModelSelector
 
 
 @dataclass(frozen=True)
@@ -14,17 +15,28 @@ class SelectionResult:
 
 
 class PerDestinationModelSelector:
-    """Selects the best model for a destination based on a configurable metric."""
+    """Selects the best model for a destination based on a configurable metric.
+
+    Delegates core selection logic to the unified
+    :class:`~forecasting.evaluation.model_selector.ModelSelector`.
+
+    Parameters
+    ----------
+    metric : str, optional
+        The metric name to minimise. Must be one of ``VALID_METRICS``.
+        Defaults to ``"wape"``.
+
+    Raises
+    ------
+    ValueError
+        If *metric* is not in ``VALID_METRICS``.
+    """
 
     VALID_METRICS = {"wape", "mae", "rmse", "mape", "mse"}
 
     def __init__(self, metric: str = "wape"):
-        if metric not in self.VALID_METRICS:
-            raise ValueError(
-                f"Metric '{metric}' not recognised. "
-                f"Available: wape, mae, rmse, mape, mse"
-            )
-        self.metric = metric
+        self._selector = ModelSelector(metric=metric)
+        self.metric = self._selector.metric
 
     def select(
         self,
@@ -44,6 +56,8 @@ class PerDestinationModelSelector:
         Returns
         -------
         SelectionResult
+            The selection outcome containing destination_id, model_name,
+            and the full metrics dictionary for the winning model.
 
         Raises
         ------
@@ -51,10 +65,9 @@ class PerDestinationModelSelector:
             If the metric name is not present in the metrics dicts, or if no
             valid (non-null, non-NaN) metric values exist for selection.
         """
-        best_name: str | None = None
-        best_value: float | None = None
-        best_metrics: dict[str, float] | None = None
-
+        # Pre-validate that the metric key exists in each model's metrics dict.
+        # The unified selector uses .get() which silently skips missing keys,
+        # but the per-destination contract requires an explicit error.
         for model_name, metrics in model_metrics:
             if self.metric not in metrics:
                 raise ValueError(
@@ -62,18 +75,13 @@ class PerDestinationModelSelector:
                     f"'{model_name}'. Available: {sorted(metrics.keys())}"
                 )
 
-            value = metrics[self.metric]
-
-            # Skip NaN values
-            if value is None or (isinstance(value, float) and math.isnan(value)):
-                continue
-
-            if best_value is None or value < best_value:
-                best_name = model_name
-                best_value = value
-                best_metrics = metrics
-
-        if best_name is None:
+        try:
+            best_name, best_metrics = self._selector.select_best_from_tuples(
+                model_metrics
+            )
+        except ValueError:
+            # Re-raise with destination-specific message to preserve the
+            # original error contract.
             raise ValueError(
                 f"No valid (non-null, non-NaN) values for metric '{self.metric}' "
                 f"across all models for destination '{destination_id}'. "

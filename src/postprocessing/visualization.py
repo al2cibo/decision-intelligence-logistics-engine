@@ -1,6 +1,4 @@
-"""
-In this class we will build the graphs we are going to show to visualize results and input data
-"""
+"""Visualization utilities for logistics forecasting results."""
 
 import matplotlib.pyplot as plt
 import polars as pl
@@ -8,6 +6,15 @@ from pathlib import Path
 
 
 class VisualizationEngine:
+    """Engine for producing time-series visualizations of forecast results.
+
+    Parameters
+    ----------
+    df : pl.DataFrame
+        DataFrame containing time-series data with at minimum a
+        ``destination_id`` column, a ``date`` column, and one or more
+        value columns for actuals and predictions.
+    """
 
     def __init__(self, df: pl.DataFrame):
         self.df = df
@@ -18,8 +25,30 @@ class VisualizationEngine:
         actuals_col_name: str,
         predicted_col_name: str,
         save_fig_location: Path = None,
-        show: bool = True,
+        show: bool = False,
     ):
+        """Produce a time-series plot comparing actuals to predictions.
+
+        Parameters
+        ----------
+        target_destination : str
+            The destination identifier to filter the data on.
+        actuals_col_name : str
+            Column name containing actual demand values.
+        predicted_col_name : str
+            Column name containing predicted demand values.
+        save_fig_location : Path, optional
+            Directory path where the figure will be saved. If ``None``,
+            the figure is not saved to disk.
+        show : bool, optional
+            Whether to display the plot interactively. Defaults to
+            ``False`` so that automated pipelines do not block.
+
+        Raises
+        ------
+        ValueError
+            If no data is found for the specified destination.
+        """
         destination_df = self.df.filter(
             pl.col("destination_id") == target_destination
         ).sort("date")
@@ -53,3 +82,5 @@ class VisualizationEngine:
 
         if show:
             plt.show()
+        else:
+            plt.close(fig)

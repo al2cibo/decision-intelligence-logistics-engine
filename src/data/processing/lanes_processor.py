@@ -1,16 +1,16 @@
-from data.processing.base_processor import BaseProcessor
+from data.processing.validation import validate_non_empty, validate_columns
 
 from polars import DataFrame
 
 
-class LanesProcessor(BaseProcessor):
+class LanesProcessor:
 
     REQUIRED_COLUMNS = {"origin_id", "destination_id", "unit_cost"}
 
     @staticmethod
     def process(df: DataFrame) -> DataFrame:
-        LanesProcessor._validate_non_empty(df)
-        LanesProcessor._validate_columns(df, LanesProcessor.REQUIRED_COLUMNS)
+        validate_non_empty(df)
+        validate_columns(df, LanesProcessor.REQUIRED_COLUMNS)
 
         df = df.unique()
 

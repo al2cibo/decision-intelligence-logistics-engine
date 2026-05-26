@@ -3,6 +3,7 @@ This class is responsible to get a list of models and then produce the output.
 """
 
 import logging
+from typing import Any
 
 import polars as pl
 from forecasting.models.base_forecaster import BaseForecaster
@@ -15,7 +16,25 @@ class ForecastingPipeline:
     def __init__(self, models: list[BaseForecaster]):
         self.models = models
 
-    def run(self, df: pl.DataFrame, train_ratio: float | None = None) -> pl.DataFrame:
+    def run(self, df: pl.DataFrame, **kwargs: Any) -> pl.DataFrame:
+        """Execute the forecasting pipeline.
+
+        Parameters
+        ----------
+        df : pl.DataFrame
+            Input DataFrame containing the data to process.
+        **kwargs : Any
+            Additional keyword arguments. Supports:
+            - train_ratio (float | None): Fraction of data for training.
+              Must be between 0 and 1 exclusive. If None, all data is used
+              for both fitting and prediction.
+
+        Returns
+        -------
+        pl.DataFrame
+            DataFrame with forecast columns appended by each model.
+        """
+        train_ratio: float | None = kwargs.get("train_ratio", None)
         result_df = df
 
         if train_ratio is not None:

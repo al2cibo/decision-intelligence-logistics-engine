@@ -7,6 +7,15 @@ import polars as pl
 from ortools.linear_solver import pywraplp
 
 from .multi_period_result import MultiPeriodResult
+from .validation import (
+    check_capacity_feasibility,
+    check_unreachable_destinations,
+    validate_columns,
+    validate_non_negative_costs,
+    validate_not_empty,
+    validate_origins_in_lanes,
+    validate_positive_capacities,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -71,15 +80,24 @@ class MultiPeriodOptimizer:
         """
         # --- validation (order matters) -----------------------------------
         self._validate_not_empty(demand_ts, origins_df, lanes_df, planning_horizon)
-        self._validate_demand_schema(demand_ts)
-        self._validate_costs(lanes_df, destinations_df)
-        self._validate_capacities(origins_df)
-        self._validate_origins_in_lanes(origins_df, lanes_df)
+        validate_columns(
+            demand_ts,
+            {"destination_id", "date", "demand"},
+            "Demand time series",
+            message_template="{df_name} missing required columns: {missing}",
+        )
+        validate_non_negative_costs(lanes_df, destinations_df)
+        validate_positive_capacities(origins_df)
+        validate_origins_in_lanes(origins_df, lanes_df)
         self._validate_initial_inventory(initial_inventory)
         self._validate_variable_count(lanes_df, demand_ts, planning_horizon)
 
         # --- feasibility pre-checks ---------------------------------------
-        self._check_unreachable_destinations(demand_ts, lanes_df)
+        check_unreachable_destinations(
+            demand_ts,
+            lanes_df,
+            message_template="Unreachable destinations (no lane serves them): {unreachable}",
+        )
         self._check_capacity_feasibility(demand_ts, origins_df, planning_horizon)
 
         # --- demand preprocessing -----------------------------------------
@@ -332,80 +350,15 @@ class MultiPeriodOptimizer:
         planning_horizon: list[date],
     ) -> None:
         """Raise ``ValueError`` if any required input is empty."""
-        if demand_ts.is_empty():
-            raise ValueError("no demand data available")
-        if origins_df.is_empty():
-            raise ValueError("Origins DataFrame is empty")
-        if lanes_df.is_empty():
-            raise ValueError("Lanes DataFrame is empty")
+        validate_not_empty(
+            **{
+                "no demand data available": demand_ts,
+                "Origins DataFrame is empty": origins_df,
+                "Lanes DataFrame is empty": lanes_df,
+            }
+        )
         if len(planning_horizon) == 0:
             raise ValueError("Planning horizon contains zero periods")
-
-    @staticmethod
-    def _validate_demand_schema(demand_ts: pl.DataFrame) -> None:
-        """Raise ``ValueError`` if demand_ts is missing required columns."""
-        required_columns = {"destination_id", "date", "demand"}
-        missing = required_columns - set(demand_ts.columns)
-        if missing:
-            raise ValueError(
-                f"Demand time series missing required columns: {sorted(missing)}"
-            )
-
-    @staticmethod
-    def _validate_costs(
-        lanes_df: pl.DataFrame,
-        destinations_df: pl.DataFrame,
-    ) -> None:
-        """Raise ``ValueError`` if any cost values are negative."""
-        # Check unit_cost in lanes
-        if "unit_cost" in lanes_df.columns:
-            negative_costs = lanes_df.filter(pl.col("unit_cost") < 0)
-            if not negative_costs.is_empty():
-                invalid_rows = negative_costs.select(
-                    "origin_id", "destination_id", "unit_cost"
-                ).to_dicts()
-                raise ValueError(
-                    f"Negative unit_cost values found: {invalid_rows}"
-                )
-
-        # Check holding_cost in destinations (only if column exists)
-        if "holding_cost" in destinations_df.columns:
-            negative_holding = destinations_df.filter(pl.col("holding_cost") < 0)
-            if not negative_holding.is_empty():
-                invalid_rows = negative_holding.select(
-                    "destination_id", "holding_cost"
-                ).to_dicts()
-                raise ValueError(
-                    f"Negative holding_cost values found: {invalid_rows}"
-                )
-
-    @staticmethod
-    def _validate_capacities(origins_df: pl.DataFrame) -> None:
-        """Raise ``ValueError`` if any origin has non-positive daily_capacity."""
-        if "daily_capacity" in origins_df.columns:
-            invalid = origins_df.filter(pl.col("daily_capacity") <= 0)
-            if not invalid.is_empty():
-                invalid_rows = invalid.select(
-                    "origin_id", "daily_capacity"
-                ).to_dicts()
-                raise ValueError(
-                    f"Non-positive daily_capacity values found: {invalid_rows}"
-                )
-
-    @staticmethod
-    def _validate_origins_in_lanes(
-        origins_df: pl.DataFrame,
-        lanes_df: pl.DataFrame,
-    ) -> None:
-        """Raise ``ValueError`` if lanes reference origins not in origins_df."""
-        origin_ids = set(origins_df["origin_id"].to_list())
-        lane_origin_ids = set(lanes_df["origin_id"].to_list())
-        missing_origins = sorted(lane_origin_ids - origin_ids)
-        if missing_origins:
-            raise ValueError(
-                f"Origins referenced in lanes but missing from origins_df: "
-                f"{missing_origins}"
-            )
 
     @staticmethod
     def _validate_initial_inventory(
@@ -449,20 +402,6 @@ class MultiPeriodOptimizer:
     # ------------------------------------------------------------------
 
     @staticmethod
-    def _check_unreachable_destinations(
-        demand_ts: pl.DataFrame,
-        lanes_df: pl.DataFrame,
-    ) -> None:
-        """Raise ``ValueError`` if any demanded destination has no lane serving it."""
-        demanded_destinations = set(demand_ts["destination_id"].unique().to_list())
-        served_destinations = set(lanes_df["destination_id"].unique().to_list())
-        unreachable = sorted(demanded_destinations - served_destinations)
-        if unreachable:
-            raise ValueError(
-                f"Unreachable destinations (no lane serves them): {unreachable}"
-            )
-
-    @staticmethod
     def _check_capacity_feasibility(
         demand_ts: pl.DataFrame,
         origins_df: pl.DataFrame,
@@ -478,12 +417,14 @@ class MultiPeriodOptimizer:
         total_capacity = origins_df["daily_capacity"].sum() * n_periods
         total_demand = demand_ts["demand"].fill_null(0).sum()
 
-        if total_capacity < total_demand:
-            shortfall = total_demand - total_capacity
-            raise ValueError(
-                f"Insufficient total capacity: total demand = {total_demand}, "
-                f"total capacity = {total_capacity}, shortfall = {shortfall}"
-            )
+        check_capacity_feasibility(
+            total_demand,
+            total_capacity,
+            message_template=(
+                "Insufficient total capacity: total demand = {total_demand}, "
+                "total capacity = {total_capacity}, shortfall = {shortfall}"
+            ),
+        )
 
     # ------------------------------------------------------------------
     # Demand preprocessing
