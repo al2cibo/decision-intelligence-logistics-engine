@@ -12,150 +12,267 @@ The project is designed to showcase production-oriented applied science and engi
 
 ## Project Goal
 
-The objective of this project is to build a scalable logistics decision engine that can:
+Build a scalable logistics decision engine that can:
 
-1. generate or ingest historical shipment and demand data,
-2. forecast future demand,
-3. simulate uncertain logistics scenarios,
-4. optimize origin-destination flows under capacity and cost constraints,
-5. expose the full pipeline through an API.
+1. Generate or ingest historical shipment and demand data
+2. Forecast future demand — independently per destination
+3. Simulate uncertain logistics scenarios
+4. Optimize origin-destination flows under capacity and cost constraints
+5. Expose the full pipeline through an API
 
-This repository is meant to reflect how real-world planning systems are built: not only with mathematical models, but also with robust data pipelines, modular software design, and deployable services.
+This repository reflects how real-world planning systems are built: not only with mathematical models, but also with robust data pipelines, modular software design, and deployable services.
+
+---
+
+## Architecture
+
+```mermaid
+graph TD
+    subgraph "Data Layer"
+        RAW[Raw Data / Synthetic Generation] --> PROC[Data Processing]
+        PROC --> DF[Polars DataFrame]
+    end
+
+    subgraph "Forecasting Layer"
+        DF --> PART[Partition by Destination]
+        PART --> |"dest A"| WA[Worker A]
+        PART --> |"dest B"| WB[Worker B]
+        PART --> |"dest N"| WN[Worker N]
+
+        subgraph "Per-Destination Pipeline (parallel via joblib)"
+            WA --> SPLIT[Train/Test Split]
+            SPLIT --> FIT[Fit Models]
+            FIT --> EVAL[Evaluate]
+            EVAL --> SEL[Select Best Model]
+        end
+
+        SEL --> FR[ForecastResult per Destination]
+    end
+
+    subgraph "Optimization Layer"
+        FR --> AGG[Aggregate Demand]
+        AGG --> OPT[Min-Cost Transportation LP]
+        OPT --> FLOW[Optimal Flow Allocation]
+    end
+```
+
+### Per-Destination Forecasting Pipeline
+
+The forecasting system uses a **local model architecture**: each destination gets its own independently trained, evaluated, and selected model. This captures local demand patterns (seasonality, trend, volatility) that a single global model cannot.
+
+```
+Input DataFrame (date, destination_id, demand)
+    │
+    ├── Partition by destination_id
+    │
+    ├── For each destination (parallelizable):
+    │   ├── Sort by date
+    │   ├── Split train/test (chronological)
+    │   ├── For each model in registry:
+    │   │   ├── Fit on train
+    │   │   ├── Predict on test
+    │   │   └── Evaluate (WAPE, MAE, RMSE, MAPE, MSE)
+    │   └── Select best model (minimize configurable metric)
+    │
+    └── Aggregate results → AggregatedPipelineResult
+```
+
+---
 
 ## Core Components
 
 ### 1. Data Layer
-- Synthetic or open logistics data generation
+- Synthetic logistics data generation
 - Data processing with Polars
-- Analytical queries with DuckDB
 - Efficient storage in Parquet format
 
 ### 2. Forecasting Layer
-- Demand prediction using baseline models (Naive, Seasonal Lag, Rolling Window)
-- Automatic model evaluation with MAE, MSE, MAPE, WAPE metrics
-- Model selection: automatic ranking and best-model selection by configurable metric
-- Forecast extraction into standardized schema and demand aggregation per destination
-- Feature engineering with lag and rolling statistics
-- Experiment tracking with MLflow
+- **Per-destination model training** — one model per destination, independently selected
+- **Model Registry** — factory pattern for dynamic model instantiation
+- **Supported models**: Naive, Seasonal Naive, Rolling Window (Moving Average), ETS, ARIMA/SARIMAX
+- **Evaluation**: WAPE, MAE, RMSE, MAPE, MSE per destination per model
+- **Model selection**: automatic best-model selection per destination by configurable metric
+- **Parallel execution**: joblib-based parallelism across destinations (configurable workers)
+- **Fault tolerance**: individual destination failures don't block the pipeline
+- **Reproducibility**: deterministic results regardless of row ordering or parallelism level
+- **Persistence interface**: abstract storage layer (ready for S3, database, filesystem)
 
-### 3. Simulation Layer
+### 3. Optimization Layer
+- Minimum-cost transportation LP using OR-Tools (GLOP / CBC solvers)
+- Multi-period optimization with inventory tracking
+- Capacity-constrained origin-to-destination flow assignment
+- Input validation with pre-solve feasibility checks
+- Integration of forecast-derived demand into downstream optimization
+
+### 4. Simulation Layer *(planned)*
 - Event-driven simulation of shipment arrivals, delays, and processing
 - Stochastic demand generation
 - Scenario analysis under uncertainty
 
-### 4. Optimization Layer
-- Minimum-cost transportation LP using OR-Tools (GLOP / CBC solvers)
-- Capacity-constrained origin-to-destination flow assignment
-- Input validation with pre-solve feasibility checks (unreachable destinations, insufficient capacity)
-- Integration of forecast-derived demand into downstream optimization
-
-### 5. Serving Layer
+### 5. Serving Layer *(planned)*
 - FastAPI endpoints for simulation, forecasting, and optimization
-- Reproducible configuration and modular architecture
+
+---
 
 ## Tech Stack
 
-- Python 3.11+
-- Polars — high-performance DataFrames
-- OR-Tools — linear programming solvers (GLOP, CBC)
-- Scikit-learn — forecasting evaluation metrics
-- NumPy — numerical operations
-- Matplotlib — visualization
-- PyYAML — configuration management
-- pytest / Hypothesis — testing and property-based testing
-- DuckDB (planned)
-- FastAPI (planned)
-- MLflow (planned)
-- SimPy (planned, for simulation extensions)
+| Category | Tools |
+|----------|-------|
+| Language | Python 3.11+ |
+| DataFrames | Polars |
+| Optimization | OR-Tools (GLOP, CBC) |
+| Statistical Models | statsmodels (ETS, ARIMA) |
+| Metrics | scikit-learn |
+| Parallelism | joblib |
+| Numerics | NumPy |
+| Visualization | Matplotlib |
+| Configuration | PyYAML |
+| Testing | pytest, Hypothesis (property-based testing) |
+
+---
 
 ## Repository Structure
 
 ```text
 decision-intelligence-logistics-engine/
 │
-├── data/
-│   ├── synthetic/          # parquet files (demand_history, origins, destinations, lanes)
-│   └── output/             # metrics summaries, plots
-├── notebooks/              # exploratory analysis and prototyping
+├── configs/                    # YAML configuration files
+├── data/                       # parquet files and output
+├── notebooks/                  # exploratory analysis
+├── scripts/
+│   └── example_end_to_end_pipeline.py  # runnable demo
+│
 ├── src/
 │   ├── data/
-│   │   ├── ingestion.py        # Reader: parquet file loading
-│   │   ├── input_data.py       # InputData dataclass
-│   │   └── processing/         # per-dataset processors (demand, origins, lanes, destinations)
+│   │   ├── ingestion.py
+│   │   ├── input_data.py
+│   │   └── processing/
+│   │
 │   ├── forecasting/
-│   │   ├── models/             # BaseForecaster, NaiveForecaster, SeasonalForecaster, RollingWindowForecaster
-│   │   ├── pipeline.py         # ForecastingPipeline: runs models sequentially
-│   │   ├── evaluator.py        # Evaluator: MAE, MSE, MAPE, WAPE
-│   │   ├── model_selector.py   # ModelSelector: best-model selection and ranking
-│   │   └── forecast_extractor.py  # ForecastExtractor: extraction and demand aggregation
+│   │   ├── models/             # BaseForecaster + concrete models
+│   │   │   ├── base_forecaster.py
+│   │   │   ├── naive_forecaster.py
+│   │   │   ├── seasonal_forecaster.py
+│   │   │   ├── rolling_window_forecaster.py
+│   │   │   ├── ets_forecaster.py
+│   │   │   └── sarimax_forecaster.py
+│   │   ├── registry/           # Model registry + default setup
+│   │   │   ├── model_registry.py
+│   │   │   └── default_registry.py
+│   │   ├── evaluation/         # Metrics + model selection
+│   │   │   ├── evaluator.py
+│   │   │   ├── model_selector.py
+│   │   │   └── per_destination_model_selector.py
+│   │   ├── pipeline/           # Orchestration
+│   │   │   ├── pipeline.py
+│   │   │   ├── per_destination_pipeline.py
+│   │   │   └── pipeline_factory.py
+│   │   ├── persistence/        # Storage abstraction
+│   │   │   ├── persistence.py
+│   │   │   └── in_memory_persistence.py
+│   │   └── results/            # Data objects
+│   │       ├── forecast_result.py
+│   │       └── forecast_extractor.py
+│   │
 │   ├── optimization/
-│   │   └── optimizer.py        # Optimizer: min-cost transportation LP (OR-Tools)
+│   │   ├── optimizer.py
+│   │   ├── multi_period_optimizer.py
+│   │   ├── multi_period_result.py
+│   │   └── optimizer_interface.py
+│   │
 │   ├── postprocessing/
-│   │   ├── metrics_summary.py  # MetricsSummary: collect and export evaluation results
-│   │   └── visualization.py    # VisualizationEngine: time series plots
-│   ├── simulation/             # (planned) stochastic and event-driven simulation
-│   ├── api/                    # (planned) FastAPI endpoints
-│   └── utils/                  # config loading, system paths
+│   │   ├── metrics_summary.py
+│   │   └── visualization.py
+│   │
+│   └── utils/
+│       ├── config.py
+│       └── system_paths.py
 │
-├── tests/                  # unit and integration tests
-├── configs/                # YAML configuration files
-├── scripts/                # runnable end-to-end pipeline scripts
+├── tests/                      # 182 tests (unit + property-based)
 ├── pyproject.toml
+├── requirements.txt
 └── README.md
 ```
 
-## Pipeline Flow
+---
 
-The end-to-end pipeline (`scripts/example_end_to_end_pipeline.py`) executes the following stages:
+## Quick Start
+
+```bash
+# Clone and setup
+git clone https://github.com/<your-username>/decision-intelligence-logistics-engine.git
+cd decision-intelligence-logistics-engine
+python -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+
+# Run the full pipeline demo
+python scripts/example_end_to_end_pipeline.py
+
+# Run tests
+python -m pytest tests/ -v
+```
+
+---
+
+## Example Output
+
+Running the per-destination pipeline on synthetic data with 4 destinations:
 
 ```
-Reader → DataProcessor → ForecastingPipeline → Evaluator → MetricsSummary
-  → ModelSelector → ForecastExtractor → Optimizer → Flow decisions
+Destination D01  -> Best model: seasonal_forecaster  (WAPE: 0.027)
+Destination D02  -> Best model: ma_7_forecaster      (WAPE: 0.063)
+Destination D03  -> Best model: ma_7_forecaster      (WAPE: 0.180)
+Destination D04  -> Best model: ma_7_forecaster      (WAPE: 0.067)
 ```
 
-1. **Data Ingestion** — reads parquet files (demand history, origins, destinations, lanes)
-2. **Data Processing** — validates, deduplicates, and sorts each dataset
-3. **Forecasting** — runs Naive, Seasonal, and Rolling Window models
-4. **Evaluation** — computes MAE, MSE, MAPE, WAPE per model
-5. **Model Selection** — picks the best model by WAPE
-6. **Demand Aggregation** — extracts forecasts and computes average daily demand per destination
-7. **Optimization** — solves a min-cost transportation LP to allocate supply to destinations
-8. **Output** — prints optimal flow allocation and total shipping cost
+Each destination independently selects the model best suited to its demand pattern.
+
+---
+
+## Design Principles
+
+- **Explicit destination isolation** — no data leakage between destinations
+- **No global model selection** — each destination has its own best model
+- **Row-order independence** — results are deterministic regardless of input ordering
+- **Fault tolerance** — one destination's failure doesn't block others
+- **Open-closed architecture** — add new models (LightGBM, Prophet, DeepAR) without modifying pipeline code
+- **Property-based testing** — 13 formal correctness properties verified with Hypothesis
+
+---
+
+## Testing
+
+The project uses **pytest** with **Hypothesis** for property-based testing:
+
+```bash
+python -m pytest tests/ -v
+# 182 passed
+```
+
+Key correctness properties verified:
+- Data isolation between destinations
+- Temporal split correctness (no future leakage)
+- Row-order independence
+- Model selection minimality with tiebreaking
+- Fault tolerance completeness
+- Determinism across executions
+
+---
 
 ## Planned Features
- - Synthetic logistics network generator
- - Demand generation pipeline
- - Baseline forecasting model
- - Event-driven simulator
- - Network optimization model
- - API endpoints for end-to-end execution
- - MLflow experiment tracking
- - Performance benchmarking with Polars vs Pandas
- - Docker support
 
-## Why This Project
+- [ ] FastAPI endpoints for end-to-end execution
+- [ ] MLflow experiment tracking
+- [ ] Docker support
+- [ ] Stochastic simulation layer (SimPy)
+- [ ] ML model integration (LightGBM, XGBoost, Prophet)
+- [ ] Hierarchical forecasting
+- [ ] Performance benchmarking
 
-This project is a portfolio piece built to demonstrate the ability to design and implement decision systems that go beyond isolated models.
+---
 
-It emphasizes:
+## Author
 
-- scalable data handling,
-- integration between ML and optimization,
-- software engineering discipline,
-- reproducibility and deployability.
-
-## Status
-
-Core pipeline implemented and functional: data ingestion → forecasting → model selection → optimization.
-
-## Next Steps
-- Add FastAPI endpoints for end-to-end execution
-- Integrate MLflow experiment tracking
-- Add Docker support
-- Implement stochastic simulation layer
-- (Optional) integrate an AI powered layer to answer business related questions on data
-
-Author
-
-Christian Piermarini
+**Christian Piermarini**
 Applied Scientist / Operations Research / Machine Learning
