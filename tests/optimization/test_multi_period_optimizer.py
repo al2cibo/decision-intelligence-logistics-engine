@@ -556,7 +556,7 @@ class TestIntegrationEndToEnd:
         passes to OptimizerInterface in multi mode, and verifies a valid
         MultiPeriodResult is returned.
         """
-        from forecasting.forecast_extractor import ForecastExtractor
+        from forecasting.results.forecast_extractor import ForecastExtractor
         from optimization.optimizer_interface import OptimizerInterface
         from optimization.multi_period_result import MultiPeriodResult
 

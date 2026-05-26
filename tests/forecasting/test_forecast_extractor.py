@@ -7,7 +7,7 @@ import polars as pl
 from hypothesis import given, settings
 from hypothesis import strategies as st
 
-from forecasting.forecast_extractor import ForecastExtractor
+from forecasting.results.forecast_extractor import ForecastExtractor
 
 
 # --- Hypothesis Strategies ---

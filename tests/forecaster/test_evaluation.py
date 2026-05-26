@@ -2,7 +2,7 @@ import pytest
 import numpy as np
 import polars as pl
 
-from forecasting.evaluator import Evaluator
+from forecasting.evaluation.evaluator import Evaluator
 
 
 class TestEvaluator:

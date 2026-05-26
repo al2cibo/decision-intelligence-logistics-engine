@@ -10,6 +10,7 @@ This script demonstrates the full workflow:
 - demand aggregation
 - optimization
 - visualization
+- per-destination forecasting (independent model selection per destination)
 
 Usage:
     python example_end_to_end_pipeline.py --config configs/test_config.yaml
@@ -17,6 +18,10 @@ Usage:
 
 import argparse
 import logging
+from datetime import date, timedelta
+
+import numpy as np
+import polars as pl
 
 from data.ingestion import Reader
 from data.processing.data_processor import DataProcessor
@@ -26,17 +31,18 @@ from forecasting.models.ets_forecaster import ETSForecaster
 from forecasting.models.naive_forecaster import NaiveForecaster
 from forecasting.models.rolling_window_forecaster import RollingWindowForecaster
 from forecasting.models.seasonal_forecaster import SeasonalForecaster
-from forecasting.pipeline import ForecastingPipeline
-from forecasting.evaluator import Evaluator
-from forecasting.forecast_extractor import ForecastExtractor
-from forecasting.model_selector import ModelSelector
+from forecasting.pipeline.pipeline import ForecastingPipeline
+from forecasting.evaluation.evaluator import Evaluator
+from forecasting.results.forecast_extractor import ForecastExtractor
+from forecasting.evaluation.model_selector import ModelSelector
+from forecasting.pipeline.pipeline_factory import create_per_destination_pipeline_from_config
 
 from postprocessing.metrics_summary import MetricsSummary
 from postprocessing.visualization import VisualizationEngine
 
 from optimization import Optimizer
 
-from utils.config import load_config
+from utils.config import load_config, PerDestinationConfig
 from utils.system_paths import get_project_root
 
 # ---------------------------------------------------------------------
@@ -135,6 +141,147 @@ def run_visualization(results, best_model, project_root):
     logger.info("Visualization generated.")
 
 
+# ---------------------------------------------------------------------
+# Per-Destination Forecasting Pipeline
+# ---------------------------------------------------------------------
+def generate_synthetic_destination_data(
+    destinations: list[str],
+    n_days: int = 90,
+    start_date: date | None = None,
+) -> pl.DataFrame:
+    """Generate synthetic demand data with distinct patterns per destination.
+
+    Each destination gets a different demand profile:
+    - D01: steady demand with weekly seasonality
+    - D02: trending upward with noise
+    - D03: high volatility with occasional spikes
+    - D04: low, stable demand
+    """
+    if start_date is None:
+        start_date = date(2024, 1, 1)
+
+    rng = np.random.default_rng(seed=42)
+    rows = []
+
+    for dest in destinations:
+        for day_offset in range(n_days):
+            current_date = start_date + timedelta(days=day_offset)
+            day_of_week = current_date.weekday()
+
+            if dest == "D01":
+                # Weekly seasonality: higher on weekdays
+                base = 100 + (20 if day_of_week < 5 else -10)
+                demand = base + rng.normal(0, 5)
+            elif dest == "D02":
+                # Upward trend
+                base = 50 + day_offset * 0.5
+                demand = base + rng.normal(0, 8)
+            elif dest == "D03":
+                # High volatility with spikes
+                base = 80
+                spike = 50 if rng.random() < 0.1 else 0
+                demand = base + spike + rng.normal(0, 15)
+            else:
+                # Low stable demand
+                demand = 30 + rng.normal(0, 3)
+
+            rows.append({
+                "date": current_date,
+                "destination_id": dest,
+                "demand": max(0.0, float(demand)),
+            })
+
+    return pl.DataFrame(rows).cast({"date": pl.Date, "demand": pl.Float64})
+
+
+def run_per_destination_pipeline():
+    """Demonstrate the per-destination forecasting pipeline on synthetic data."""
+    logger.info("=" * 70)
+    logger.info("PER-DESTINATION FORECASTING PIPELINE DEMO")
+    logger.info("=" * 70)
+
+    # Generate synthetic data with 4 destinations
+    destinations = ["D01", "D02", "D03", "D04"]
+    df = generate_synthetic_destination_data(destinations, n_days=90)
+
+    logger.info(
+        "Generated synthetic data: %d rows, %d destinations, %d days",
+        df.height,
+        len(destinations),
+        90,
+    )
+    logger.info("Destinations: %s", destinations)
+    logger.info("Data sample:\n%s", df.head(8))
+
+    # Configure the per-destination pipeline
+    config = PerDestinationConfig(
+        model_names=[
+            "naive_forecaster",
+            "seasonal_forecaster",
+            "rolling_window_forecaster",
+        ],
+        train_ratio=0.8,
+        selection_metric="wape",
+        max_workers=1,
+        minimum_history_length=10,
+        random_seed=42,
+        model_params={
+            "seasonal_forecaster": {"lag_value": 7},
+            "rolling_window_forecaster": {"rolling_window": 7},
+        },
+    )
+
+    # Create pipeline from config (validates model names against registry)
+    pipeline = create_per_destination_pipeline_from_config(config)
+
+    # Run the pipeline
+    logger.info("Running per-destination pipeline...")
+    result = pipeline.run(df)
+
+    # Display results
+    logger.info("-" * 70)
+    logger.info("RESULTS SUMMARY")
+    logger.info("-" * 70)
+    logger.info(
+        "Total destinations processed: %d successful, %d failed",
+        len(result.successful),
+        len(result.failed),
+    )
+
+    for outcome in result.successful:
+        selected = outcome.selected
+        logger.info(
+            "  Destination %-4s -> Best model: %-28s (WAPE: %.4f, MAE: %.4f)",
+            outcome.destination_id,
+            selected.model_name,
+            selected.metrics.get("wape", float("nan")),
+            selected.metrics.get("mae", float("nan")),
+        )
+
+        # Show all model metrics for this destination
+        if outcome.results:
+            for fr in outcome.results:
+                marker = " <-- SELECTED" if fr.model_name == selected.model_name else ""
+                logger.info(
+                    "    %-28s WAPE=%.4f  MAE=%.4f  RMSE=%.4f%s",
+                    fr.model_name,
+                    fr.metrics.get("wape", float("nan")),
+                    fr.metrics.get("mae", float("nan")),
+                    fr.metrics.get("rmse", float("nan")),
+                    marker,
+                )
+
+    for outcome in result.failed:
+        logger.info(
+            "  Destination %-4s -> FAILED: %s",
+            outcome.destination_id,
+            outcome.error,
+        )
+
+    logger.info("-" * 70)
+    return result
+
+
 def main():
     args = parse_args()
 
@@ -197,7 +344,10 @@ def main():
     # --- Visualization ---
     run_visualization(results, best_model, project_root)
 
-    return opt_result
+    # --- Per-Destination Forecasting ---
+    per_dest_result = run_per_destination_pipeline()
+
+    return opt_result, per_dest_result
 
 
 if __name__ == "__main__":
