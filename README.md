@@ -77,6 +77,49 @@ Input DataFrame (date, destination_id, demand)
     └── Aggregate results → AggregatedPipelineResult
 ```
 
+### Optimization Layer: Single-Period vs Multi-Period
+
+The optimization layer solves minimum-cost transportation problems to allocate supply from origins to destinations. It supports two modes through a unified `OptimizerInterface`:
+
+**Single-Period Optimization** — answers: *"Given today's demand, how should we allocate supply right now?"*
+
+```
+Inputs:
+  - demand_df:  [destination_id, demand]         (point-in-time demand)
+  - origins_df: [origin_id, daily_capacity]
+  - lanes_df:   [origin_id, destination_id, unit_cost]
+
+Objective: minimize Σ unit_cost(o,d) × flow(o,d)
+Subject to:
+  - Demand satisfaction:  Σ_o flow(o,d) ≥ demand(d)     ∀ destinations
+  - Capacity limits:      Σ_d flow(o,d) ≤ capacity(o)   ∀ origins
+  - Non-negativity:       flow(o,d) ≥ 0
+
+Output: OptimizationResult (flows + total_cost)
+```
+
+**Multi-Period Optimization** — answers: *"Over the next N days, how should we ship and store inventory to minimize total cost?"*
+
+```
+Inputs:
+  - demand_ts:        [destination_id, date, demand]   (time-indexed demand)
+  - origins_df:       [origin_id, daily_capacity]
+  - lanes_df:         [origin_id, destination_id, unit_cost]
+  - destinations_df:  [destination_id, holding_cost]
+  - planning_horizon: [date_1, date_2, ..., date_T]
+  - initial_inventory: {destination_id: quantity}
+
+Objective: minimize Σ unit_cost(o,d) × flow(o,d,t) + Σ holding_cost(d) × inventory(d,t)
+Subject to:
+  - Inventory balance: inv(d,t) = inv(d,t-1) + inflow(d,t) - demand(d,t)
+  - Capacity limits:   Σ_d flow(o,d,t) ≤ capacity(o)   ∀ origins, periods
+  - Non-negativity:    flow(o,d,t) ≥ 0, inv(d,t) ≥ 0
+
+Output: MultiPeriodResult (time-indexed flows + inventory levels + total_cost)
+```
+
+The key difference: single-period treats each day independently (myopic), while multi-period jointly optimizes across the entire horizon, trading off shipping costs against holding costs and anticipating future demand.
+
 ---
 
 ## Core Components
@@ -98,10 +141,12 @@ Input DataFrame (date, destination_id, demand)
 - **Persistence interface**: abstract storage layer (ready for S3, database, filesystem)
 
 ### 3. Optimization Layer
-- Minimum-cost transportation LP using OR-Tools (GLOP / CBC solvers)
-- Multi-period optimization with inventory tracking
+- **Single-period**: minimum-cost transportation LP — allocate supply to meet demand now
+- **Multi-period**: joint optimization over a planning horizon with inventory tracking and holding costs
+- Unified `OptimizerInterface` dispatches to the appropriate solver mode
+- OR-Tools backend (GLOP for LP, CBC for MIP)
 - Capacity-constrained origin-to-destination flow assignment
-- Input validation with pre-solve feasibility checks
+- Pre-solve feasibility checks (unreachable destinations, insufficient capacity)
 - Integration of forecast-derived demand into downstream optimization
 
 ### 4. Simulation Layer *(planned)*
@@ -130,69 +175,6 @@ Input DataFrame (date, destination_id, demand)
 | Testing | pytest, Hypothesis (property-based testing) |
 
 ---
-
-## Repository Structure
-
-```text
-decision-intelligence-logistics-engine/
-│
-├── configs/                    # YAML configuration files
-├── data/                       # parquet files and output
-├── notebooks/                  # exploratory analysis
-├── scripts/
-│   └── example_end_to_end_pipeline.py  # runnable demo
-│
-├── src/
-│   ├── data/
-│   │   ├── ingestion.py
-│   │   ├── input_data.py
-│   │   └── processing/
-│   │
-│   ├── forecasting/
-│   │   ├── models/             # BaseForecaster + concrete models
-│   │   │   ├── base_forecaster.py
-│   │   │   ├── naive_forecaster.py
-│   │   │   ├── seasonal_forecaster.py
-│   │   │   ├── rolling_window_forecaster.py
-│   │   │   ├── ets_forecaster.py
-│   │   │   └── sarimax_forecaster.py
-│   │   ├── registry/           # Model registry + default setup
-│   │   │   ├── model_registry.py
-│   │   │   └── default_registry.py
-│   │   ├── evaluation/         # Metrics + model selection
-│   │   │   ├── evaluator.py
-│   │   │   ├── model_selector.py
-│   │   │   └── per_destination_model_selector.py
-│   │   ├── pipeline/           # Orchestration
-│   │   │   ├── pipeline.py
-│   │   │   ├── per_destination_pipeline.py
-│   │   │   └── pipeline_factory.py
-│   │   ├── persistence/        # Storage abstraction
-│   │   │   ├── persistence.py
-│   │   │   └── in_memory_persistence.py
-│   │   └── results/            # Data objects
-│   │       ├── forecast_result.py
-│   │       └── forecast_extractor.py
-│   │
-│   ├── optimization/
-│   │   ├── optimizer.py
-│   │   ├── multi_period_optimizer.py
-│   │   ├── multi_period_result.py
-│   │   └── optimizer_interface.py
-│   │
-│   ├── postprocessing/
-│   │   ├── metrics_summary.py
-│   │   └── visualization.py
-│   │
-│   └── utils/
-│       ├── config.py
-│       └── system_paths.py
-│
-├── tests/                      # 182 tests (unit + property-based)
-├── pyproject.toml
-├── requirements.txt
-└── README.md
-```
 
 ---
 
