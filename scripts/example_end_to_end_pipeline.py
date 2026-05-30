@@ -1,16 +1,12 @@
 """
-Example end-to-end pipeline for the Decision Intelligence Logistics Engine.
+End-to-end pipeline: per-destination forecasting → multi-period optimization.
 
-This script demonstrates the full workflow:
-- data ingestion
-- data processing
-- forecasting
-- model evaluation
-- model selection
-- demand aggregation
-- optimization
-- visualization
-- per-destination forecasting (independent model selection per destination)
+Workflow:
+  1. Ingest and process raw data
+  2. Run PerDestinationPipeline — independently train, evaluate, and select
+     the best forecasting model per destination
+  3. Extract the selected model's test-period forecasts as a demand time series
+  4. Feed that demand time series into the MultiPeriodOptimizer
 
 Usage:
     python example_end_to_end_pipeline.py --config configs/test_config.yaml
@@ -24,26 +20,14 @@ import polars as pl
 from data.ingestion import Reader
 from data.processing.data_processor import DataProcessor
 
-from forecasting.models.sarimax_forecaster import ARIMAForecaster
-from forecasting.models.ets_forecaster import ETSForecaster
-from forecasting.models.naive_forecaster import NaiveForecaster
-from forecasting.models.rolling_window_forecaster import RollingWindowForecaster
-from forecasting.models.seasonal_forecaster import SeasonalForecaster
-from forecasting.pipeline.pipeline import ForecastingPipeline
-from forecasting.evaluation.evaluator import Evaluator
-from forecasting.results.forecast_extractor import ForecastExtractor
-from forecasting.evaluation.model_selector import ModelSelector
 from forecasting.pipeline.pipeline_factory import create_per_destination_pipeline_from_config
+from forecasting.pipeline.per_destination_pipeline import AggregatedPipelineResult
 
-from postprocessing.metrics_summary import MetricsSummary
-from postprocessing.visualization import VisualizationEngine
-
-from optimization import Optimizer
+from optimization.multi_period_optimizer import MultiPeriodOptimizer
+from optimization.multi_period_result import MultiPeriodResult
 
 from utils.config import load_config, PerDestinationConfig
 from utils.system_paths import get_project_root
-
-from synthetic_data import generate_synthetic_destination_data
 
 # ---------------------------------------------------------------------
 # Logging
@@ -66,175 +50,148 @@ def parse_args():
     return parser.parse_args()
 
 
-def run_forecasting(clean_data, models, train_ratio=None):
-    pipeline = ForecastingPipeline(models=models)
-    results = pipeline.run(clean_data.demand_history, train_ratio=train_ratio)
-
-    logger.info("Forecasting completed. Shape: %s", results.shape)
-    return results
-
-
-def evaluate_models(results, models, output_path):
-    evaluator = Evaluator(results, "demand")
-    metrics_summary = MetricsSummary(output_folder_path=output_path)
-
-    for model in models:
-        metrics_results = evaluator.compute_metrics(
-            forecast_col_name=model.forecast_col
-        )
-        metrics_summary.collect(model_name=model.name, results=metrics_results)
-
-    summary = metrics_summary.produce_summary()
-    metrics_summary.save_summary(summary)
-
-    logger.info("Model evaluation completed.")
-    logger.info("Metrics summary (all %d models):\n%s", summary.shape[0], summary)
-    return summary
-
-
-def select_and_aggregate(results, summary, models, config=None):
-    metric = "wape"
-    if config is not None and config.forecasting is not None:
-        metric = config.forecasting.metric
-    logger.info("Using SINGLE-METRIC model selection on '%s'", metric)
-    best_model_name = ModelSelector.select_best(summary, metric=metric)
-
-    best_model = next(m for m in models if m.name == best_model_name)
-
-    logger.info("Best model selected: %s", best_model_name)
-
-    forecast_df = ForecastExtractor.extract(results, best_model.forecast_col)
-    demand_df = ForecastExtractor.aggregate_average_demand(forecast_df)
-
-    return best_model, demand_df
-
-
 # ---------------------------------------------------------------------
-# Optimization
+# Per-destination forecasting
 # ---------------------------------------------------------------------
-def run_optimization(demand_df, origins_df, lanes_df):
-    optimizer = Optimizer(solver_name="GLOP")
-
-    result = optimizer.solve(
-        demand_df=demand_df,
-        origins_df=origins_df,
-        lanes_df=lanes_df,
-    )
-
-    logger.info("Optimization completed. Total cost: %.4f", result.total_cost)
-    return result
-
-
-# ---------------------------------------------------------------------
-# Visualization
-# ---------------------------------------------------------------------
-def run_visualization(results, best_model, project_root):
-    visualization = VisualizationEngine(df=results)
-
-    visualization.produce_timeseries_plots(
-        target_destination="D01",
-        actuals_col_name="demand",
-        predicted_col_name=best_model.forecast_col,
-        save_fig_location=project_root / "data" / "output" / "plots",
-    )
-
-    logger.info("Visualization generated.")
-
-
-# ---------------------------------------------------------------------
-# Per-Destination Forecasting Pipeline
-# ---------------------------------------------------------------------
-def run_per_destination_pipeline():
-    """Demonstrate the per-destination forecasting pipeline on synthetic data."""
-    logger.info("=" * 70)
-    logger.info("PER-DESTINATION FORECASTING PIPELINE DEMO")
-    logger.info("=" * 70)
-
-    # Generate synthetic data with 4 destinations
-    destinations = ["D01", "D02", "D03", "D04"]
-    df = generate_synthetic_destination_data(destinations, n_days=90)
-
-    logger.info(
-        "Generated synthetic data: %d rows, %d destinations, %d days",
-        df.height,
-        len(destinations),
-        90,
-    )
-    logger.info("Destinations: %s", destinations)
-    logger.info("Data sample:\n%s", df.head(8))
-
-    # Configure the per-destination pipeline
-    config = PerDestinationConfig(
-        model_names=[
-            "naive_forecaster",
-            "seasonal_forecaster",
-            "rolling_window_forecaster",
-        ],
-        train_ratio=0.8,
-        selection_metric="wape",
-        max_workers=1,
-        minimum_history_length=10,
-        random_seed=42,
-        model_params={
-            "seasonal_forecaster": {"lag_value": 7},
-            "rolling_window_forecaster": {"rolling_window": 7},
-        },
-    )
-
-    # Create pipeline from config (validates model names against registry)
+def run_per_destination_forecasting(
+    demand_df: pl.DataFrame,
+    config: PerDestinationConfig,
+) -> AggregatedPipelineResult:
+    """Train, evaluate, and select the best model independently per destination."""
     pipeline = create_per_destination_pipeline_from_config(config)
 
-    # Run the pipeline
-    logger.info("Running per-destination pipeline...")
-    result = pipeline.run(df)
+    logger.info("Running per-destination pipeline on %d rows...", demand_df.height)
+    result = pipeline.run(demand_df)
 
-    # Display results
-    logger.info("-" * 70)
-    logger.info("RESULTS SUMMARY")
-    logger.info("-" * 70)
     logger.info(
-        "Total destinations processed: %d successful, %d failed",
+        "Per-destination forecasting complete: %d successful, %d failed",
         len(result.successful),
         len(result.failed),
     )
-
     for outcome in result.successful:
         selected = outcome.selected
         logger.info(
-            "  Destination %-4s -> Best model: %-28s (WAPE: %.4f, MAE: %.4f)",
+            "  Destination %-6s -> Best model: %-30s (WAPE: %.4f, MAE: %.4f)",
             outcome.destination_id,
             selected.model_name,
             selected.metrics.get("wape", float("nan")),
             selected.metrics.get("mae", float("nan")),
         )
-
-        # Show all model metrics for this destination
-        if outcome.results:
-            for fr in outcome.results:
-                marker = " <-- SELECTED" if fr.model_name == selected.model_name else ""
-                logger.info(
-                    "    %-28s WAPE=%.4f  MAE=%.4f  RMSE=%.4f%s",
-                    fr.model_name,
-                    fr.metrics.get("wape", float("nan")),
-                    fr.metrics.get("mae", float("nan")),
-                    fr.metrics.get("rmse", float("nan")),
-                    marker,
-                )
-
+        for fr in outcome.results:
+            marker = " <-- SELECTED" if fr.model_name == selected.model_name else ""
+            logger.info(
+                "    %-30s WAPE=%.4f  MAE=%.4f  RMSE=%.4f%s",
+                fr.model_name,
+                fr.metrics.get("wape", float("nan")),
+                fr.metrics.get("mae", float("nan")),
+                fr.metrics.get("rmse", float("nan")),
+                marker,
+            )
     for outcome in result.failed:
-        logger.info(
-            "  Destination %-4s -> FAILED: %s",
+        logger.warning(
+            "  Destination %-6s -> FAILED: %s",
             outcome.destination_id,
             outcome.error,
         )
 
-    logger.info("-" * 70)
     return result
 
 
+# ---------------------------------------------------------------------
+# Demand extraction
+# ---------------------------------------------------------------------
+def extract_demand_time_series(result: AggregatedPipelineResult) -> pl.DataFrame:
+    """Build a [destination_id, date, demand] DataFrame from each destination's
+    selected model forecast values (covering the test period).
+
+    Destinations that failed or whose selected ForecastResult is missing
+    are excluded with a warning.
+    """
+    frames = []
+
+    for outcome in result.successful:
+        selected_name = outcome.selected.model_name
+        selected_fr = next(
+            (fr for fr in outcome.results if fr.model_name == selected_name), None
+        )
+        if selected_fr is None:
+            logger.warning(
+                "No ForecastResult found for selected model '%s' at destination '%s'. Skipping.",
+                selected_name,
+                outcome.destination_id,
+            )
+            continue
+
+        # forecast_values has schema [date: Date, forecast: Float64]
+        dest_df = (
+            selected_fr.forecast_values
+            .with_columns(pl.lit(outcome.destination_id).alias("destination_id"))
+            .rename({"forecast": "demand"})
+            .select(["destination_id", "date", "demand"])
+        )
+        frames.append(dest_df)
+
+    if not frames:
+        raise ValueError(
+            "No forecast data available — all destinations failed or had no results."
+        )
+
+    demand_ts = pl.concat(frames).sort(["destination_id", "date"])
+    logger.info(
+        "Extracted demand time series: %d rows across %d destinations",
+        demand_ts.height,
+        demand_ts["destination_id"].n_unique(),
+    )
+    return demand_ts
+
+
+# ---------------------------------------------------------------------
+# Multi-period optimization
+# ---------------------------------------------------------------------
+def run_multi_period_optimization(
+    demand_ts: pl.DataFrame,
+    origins_df: pl.DataFrame,
+    lanes_df: pl.DataFrame,
+    destinations_df: pl.DataFrame,
+    solver_name: str = "GLOP",
+) -> MultiPeriodResult:
+    """Solve the multi-period transportation LP.
+
+    The planning horizon is derived from the unique dates present in
+    demand_ts (the test-period forecasts).
+
+    Note: destinations_df does not need a holding_cost column — if absent,
+    the optimizer minimises shipping costs only.
+    """
+    planning_horizon = sorted(demand_ts["date"].unique().to_list())
+    logger.info(
+        "Planning horizon: %d periods (%s → %s)",
+        len(planning_horizon),
+        planning_horizon[0],
+        planning_horizon[-1],
+    )
+
+    optimizer = MultiPeriodOptimizer(solver_name=solver_name)
+    result = optimizer.solve(
+        demand_ts=demand_ts,
+        origins_df=origins_df,
+        lanes_df=lanes_df,
+        destinations_df=destinations_df,
+        planning_horizon=planning_horizon,
+    )
+
+    logger.info("Multi-period optimization complete. Total cost: %.4f", result.total_cost)
+    logger.info("Flows (non-zero):\n%s", result.flows)
+    logger.info("Inventory levels:\n%s", result.inventory)
+
+    return result
+
+
+# ---------------------------------------------------------------------
+# Main
+# ---------------------------------------------------------------------
 def main():
     args = parse_args()
-
     project_root = get_project_root()
     config = load_config(project_root, project_root / args.config)
 
@@ -246,58 +203,44 @@ def main():
     if clean_data.demand_history.is_empty():
         raise ValueError("Empty demand history after processing")
 
-    # --- Forecasting ---
-    models = [
-        NaiveForecaster(),
-        SeasonalForecaster(lag_value=7),
-        RollingWindowForecaster(rolling_window=7),
-        ETSForecaster(),
-        ARIMAForecaster(),
-    ]
-
-    train_ratio = 0.8
-    if config.forecasting is not None:
-        train_ratio = config.forecasting.train_ratio
-
-    n_rows = clean_data.demand_history.shape[0]
-    split_idx = int(n_rows * train_ratio)
-    logger.info(
-        "Train/test split boundary: index %d of %d rows (train_ratio=%.2f)",
-        split_idx,
-        n_rows,
-        train_ratio,
+    # --- Per-destination forecasting config ---
+    # ETS and SARIMAX are available but slower; uncomment to include them.
+    per_dest_config = PerDestinationConfig(
+        model_names=[
+            "naive_forecaster",
+            "seasonal_forecaster",
+            "rolling_window_forecaster",
+            # "ets_forecaster",
+            # "sarimax_forecaster",
+        ],
+        train_ratio=config.forecasting.train_ratio if config.forecasting else 0.8,
+        selection_metric=config.forecasting.metric if config.forecasting else "wape",
+        max_workers=1,
+        minimum_history_length=10,
+        random_seed=42,
+        model_params={
+            "seasonal_forecaster": {"lag_value": 7},
+            "rolling_window_forecaster": {"rolling_window": 7},
+        },
     )
 
-    results = run_forecasting(clean_data, models, train_ratio=train_ratio)
-
-    # --- Evaluation ---
-    summary = evaluate_models(
-        results,
-        models,
-        project_root / "data" / "output",
+    # --- Per-destination forecasting ---
+    forecast_result = run_per_destination_forecasting(
+        clean_data.demand_history, per_dest_config
     )
 
-    # --- Model selection + demand ---
-    best_model, demand_df = select_and_aggregate(
-        results, summary, models, config=config
-    )
+    # --- Extract test-period forecasts as demand time series ---
+    demand_ts = extract_demand_time_series(forecast_result)
 
-    # --- Optimization ---
-    opt_result = run_optimization(
-        demand_df=demand_df,
+    # --- Multi-period optimization ---
+    opt_result = run_multi_period_optimization(
+        demand_ts=demand_ts,
         origins_df=clean_data.origins,
         lanes_df=clean_data.lanes,
+        destinations_df=clean_data.destinations,
     )
 
-    logger.info("Flows:\n%s", opt_result.flows)
-
-    # --- Visualization ---
-    run_visualization(results, best_model, project_root)
-
-    # --- Per-Destination Forecasting ---
-    per_dest_result = run_per_destination_pipeline()
-
-    return opt_result, per_dest_result
+    return forecast_result, opt_result
 
 
 if __name__ == "__main__":
