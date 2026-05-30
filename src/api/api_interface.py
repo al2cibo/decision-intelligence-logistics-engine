@@ -1,15 +1,12 @@
-"""Abstract base class defining the API layer contract.
-
-This module provides the ``APIInterface`` ABC that future API implementations
-must satisfy. It declares abstract methods for forecasting and optimization
-operations with full type annotations.
-"""
+"""Abstract base class defining the API layer contract."""
 
 from abc import ABC, abstractmethod
+from datetime import date
 
 import polars as pl
 
-from optimization.optimizer import OptimizationResult
+from forecasting.pipeline.per_destination_pipeline import AggregatedPipelineResult
+from optimization.multi_period_result import MultiPeriodResult
 
 
 class APIInterface(ABC):
@@ -17,63 +14,54 @@ class APIInterface(ABC):
 
     Subclasses must implement ``forecast`` and ``optimize`` to provide
     concrete API behaviour for the logistics engine.
-
-    Methods
-    -------
-    forecast(input_data)
-        Generate demand forecasts from historical data.
-    optimize(demand, origins, lanes)
-        Solve a minimum-cost transportation problem.
     """
 
     @abstractmethod
-    def forecast(self, input_data: pl.DataFrame) -> pl.DataFrame:
-        """Generate demand forecasts from historical input data.
+    def forecast(self, input_data: pl.DataFrame) -> AggregatedPipelineResult:
+        """Run per-destination forecasting on historical demand data.
 
         Parameters
         ----------
         input_data : pl.DataFrame
-            Historical demand data used as input for the forecasting model.
+            Historical demand data with schema [date, destination_id, demand].
 
         Returns
         -------
-        pl.DataFrame
-            Forecasted demand values.
-
-        Raises
-        ------
-        NotImplementedError
-            If the subclass does not implement this method.
+        AggregatedPipelineResult
+            Per-destination outcomes: selected model, metrics, and forecast values.
         """
         ...
 
     @abstractmethod
     def optimize(
         self,
-        demand: pl.DataFrame,
-        origins: pl.DataFrame,
-        lanes: pl.DataFrame,
-    ) -> OptimizationResult:
-        """Solve a minimum-cost transportation optimization problem.
+        demand_ts: pl.DataFrame,
+        origins_df: pl.DataFrame,
+        lanes_df: pl.DataFrame,
+        destinations_df: pl.DataFrame,
+        planning_horizon: list[date],
+        initial_inventory: dict[str, float] | None = None,
+    ) -> MultiPeriodResult:
+        """Solve a multi-period minimum-cost transportation problem.
 
         Parameters
         ----------
-        demand : pl.DataFrame
-            Demand data specifying required quantities per destination.
-        origins : pl.DataFrame
-            Origin (warehouse/supplier) data with capacity constraints.
-        lanes : pl.DataFrame
-            Available shipping lanes with unit costs connecting origins
-            to destinations.
+        demand_ts : pl.DataFrame
+            Time-indexed demand with schema [destination_id, date, demand].
+        origins_df : pl.DataFrame
+            Origin data with schema [origin_id, daily_capacity].
+        lanes_df : pl.DataFrame
+            Lane data with schema [origin_id, destination_id, unit_cost].
+        destinations_df : pl.DataFrame
+            Destination data with schema [destination_id, ...].
+        planning_horizon : list[date]
+            Ordered list of dates to optimise over.
+        initial_inventory : dict[str, float] | None
+            Starting inventory per destination (defaults to zero).
 
         Returns
         -------
-        OptimizationResult
-            The optimization solution containing flows and total cost.
-
-        Raises
-        ------
-        NotImplementedError
-            If the subclass does not implement this method.
+        MultiPeriodResult
+            Time-indexed flows, inventory levels, and total cost.
         """
         ...
