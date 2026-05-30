@@ -1,7 +1,6 @@
 """Forecasting pipelines: orchestration of model training, evaluation, and selection."""
 
 from .pipeline_protocol import PipelineProtocol
-from .pipeline import ForecastingPipeline
 from .per_destination_pipeline import (
     PerDestinationPipeline,
     AggregatedPipelineResult,
@@ -11,7 +10,6 @@ from .pipeline_factory import create_per_destination_pipeline_from_config
 
 __all__ = [
     "PipelineProtocol",
-    "ForecastingPipeline",
     "PerDestinationPipeline",
     "AggregatedPipelineResult",
     "DestinationOutcome",

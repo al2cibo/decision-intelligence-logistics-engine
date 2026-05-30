@@ -3,7 +3,6 @@
 from .optimizer import Optimizer, OptimizationResult
 from .multi_period_optimizer import MultiPeriodOptimizer
 from .multi_period_result import MultiPeriodResult
-from .optimizer_interface import OptimizerInterface
 from .validation import (
     validate_not_empty,
     validate_columns,
@@ -19,7 +18,6 @@ __all__ = [
     "OptimizationResult",
     "MultiPeriodOptimizer",
     "MultiPeriodResult",
-    "OptimizerInterface",
     "validate_not_empty",
     "validate_columns",
     "check_unreachable_destinations",
