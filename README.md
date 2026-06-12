@@ -179,6 +179,7 @@ The key difference: single-period treats each day independently (myopic), while 
 | Visualization | Matplotlib |
 | Configuration | PyYAML |
 | Testing | pytest, Hypothesis (property-based testing) |
+| API | FastAPI, Uvicorn |
 
 ---
 
@@ -199,6 +200,106 @@ python scripts/example_end_to_end_pipeline.py
 
 # Run tests
 python -m pytest tests/ -v
+```
+
+---
+
+## Running the API
+
+Make sure dependencies are installed, then start the server:
+
+```bash
+PYTHONPATH=src uvicorn api.app:app --reload
+```
+
+The server will be available at `http://localhost:8000`.
+
+### Interactive docs (Swagger UI)
+
+Open `http://localhost:8000/docs` in your browser. FastAPI generates a full interactive interface where you can explore all endpoints, inspect request/response schemas, and send requests directly.
+
+### Endpoints
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/health` | Liveness check |
+| `POST` | `/forecast` | Per-destination demand forecasting |
+| `POST` | `/optimize` | Multi-period min-cost flow optimization |
+| `POST` | `/plan` | Full pipeline: forecast → optimize in one call |
+
+### Example: `/health`
+
+```bash
+curl http://localhost:8000/health
+# {"status":"ok"}
+```
+
+### Example: `/forecast`
+
+```bash
+curl -X POST http://localhost:8000/forecast \
+  -H "Content-Type: application/json" \
+  -d '{
+    "demand_history": [
+      {"date": "2026-06-01", "destination_id": "D1", "demand": 100},
+      {"date": "2026-06-02", "destination_id": "D1", "demand": 105},
+      {"date": "2026-06-03", "destination_id": "D1", "demand": 98},
+      {"date": "2026-06-04", "destination_id": "D1", "demand": 110},
+      {"date": "2026-06-05", "destination_id": "D1", "demand": 115},
+      {"date": "2026-06-06", "destination_id": "D1", "demand": 120},
+      {"date": "2026-06-07", "destination_id": "D1", "demand": 118},
+      {"date": "2026-06-08", "destination_id": "D1", "demand": 125},
+      {"date": "2026-06-09", "destination_id": "D1", "demand": 130},
+      {"date": "2026-06-10", "destination_id": "D1", "demand": 128}
+    ],
+    "model_names": ["naive_forecaster", "seasonal_forecaster", "rolling_window_forecaster"],
+    "train_ratio": 0.8,
+    "selection_metric": "wape",
+    "max_workers": 1,
+    "minimum_history_length": 10,
+    "random_seed": 42,
+    "model_params": {}
+  }'
+```
+
+### Example: `/plan`
+
+```bash
+curl -X POST http://localhost:8000/plan \
+  -H "Content-Type: application/json" \
+  -d '{
+    "demand_history": [
+      {"date": "2026-06-01", "destination_id": "D1", "demand": 100},
+      {"date": "2026-06-02", "destination_id": "D1", "demand": 105},
+      {"date": "2026-06-03", "destination_id": "D1", "demand": 98},
+      {"date": "2026-06-04", "destination_id": "D1", "demand": 110},
+      {"date": "2026-06-05", "destination_id": "D1", "demand": 115},
+      {"date": "2026-06-06", "destination_id": "D1", "demand": 120},
+      {"date": "2026-06-07", "destination_id": "D1", "demand": 118},
+      {"date": "2026-06-08", "destination_id": "D1", "demand": 125},
+      {"date": "2026-06-09", "destination_id": "D1", "demand": 130},
+      {"date": "2026-06-10", "destination_id": "D1", "demand": 128}
+    ],
+    "origins": [
+      {"origin_id": "O1", "daily_capacity": 200.0},
+      {"origin_id": "O2", "daily_capacity": 150.0}
+    ],
+    "lanes": [
+      {"origin_id": "O1", "destination_id": "D1", "unit_cost": 1.5},
+      {"origin_id": "O2", "destination_id": "D1", "unit_cost": 2.0}
+    ],
+    "destinations": [
+      {"destination_id": "D1"}
+    ],
+    "model_names": ["naive_forecaster", "seasonal_forecaster", "rolling_window_forecaster"],
+    "train_ratio": 0.8,
+    "selection_metric": "wape",
+    "max_workers": 1,
+    "minimum_history_length": 10,
+    "random_seed": 42,
+    "model_params": {},
+    "initial_inventory": {"D1": 50.0}
+  }'
 ```
 
 ---
@@ -254,7 +355,7 @@ Key correctness properties verified:
 
 ## Planned Features
 
-- [ ] FastAPI endpoints for end-to-end execution (interface defined via `APIInterface`)
+- [x] FastAPI endpoints for end-to-end execution (`/forecast`, `/optimize`, `/plan`)
 - [ ] Stochastic simulation layer implementation (interface defined via `SimulationInterface`)
 - [ ] MLflow experiment tracking
 - [ ] Docker support
