@@ -28,31 +28,47 @@ This repository reflects how real-world planning systems are built: not only wit
 
 ```mermaid
 graph TD
+
     subgraph "Data Layer"
-        RAW[Raw Data / Synthetic Generation] --> PROC[Data Processing]
-        PROC --> DF[Polars DataFrame]
+        RAW[Raw Data / Synthetic Generation]
+        PROC[Data Processing]
+        DF[Polars DataFrame]
+
+        RAW --> PROC
+        PROC --> DF
     end
 
     subgraph "Forecasting Layer"
-        DF --> PART[Partition by Destination]
-        PART --> |"dest A"| WA[Worker A]
-        PART --> |"dest B"| WB[Worker B]
-        PART --> |"dest N"| WN[Worker N]
 
-        subgraph "Per-Destination Pipeline (parallel via joblib)"
-            WA --> SPLIT[Train/Test Split]
-            SPLIT --> FIT[Fit Models]
-            FIT --> EVAL[Evaluate]
-            EVAL --> SEL[Select Best Model]
-        end
+        PART[Partition by Destination]
 
-        SEL --> FR[ForecastResult per Destination]
+        DF --> PART
+
+        PART --> DA[Destination A]
+        PART --> DB[Destination B]
+        PART --> DN[Destination N]
+
+        DA --> FA[Train → Evaluate → Select Model]
+        DB --> FB[Train → Evaluate → Select Model]
+        DN --> FN[Train → Evaluate → Select Model]
+
+        FA --> FRA[Forecast A]
+        FB --> FRB[Forecast B]
+        FN --> FRN[Forecast N]
+
+        FRA --> AGG[Aggregate Forecast Demand]
+        FRB --> AGG
+        FRN --> AGG
+
     end
 
     subgraph "Optimization Layer"
-        FR --> AGG[Aggregate Demand]
-        AGG --> OPT[Min-Cost Transportation LP]
+
+        AGG --> OPT[Multi-Period Transportation Optimizer]
+
         OPT --> FLOW[Optimal Flow Allocation]
+        OPT --> INV[Inventory Trajectories]
+
     end
 ```
 
