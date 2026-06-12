@@ -234,34 +234,6 @@ curl http://localhost:8000/health
 # {"status":"ok"}
 ```
 
-### Example: `/forecast`
-
-```bash
-curl -X POST http://localhost:8000/forecast \
-  -H "Content-Type: application/json" \
-  -d '{
-    "demand_history": [
-      {"date": "2026-06-01", "destination_id": "D1", "demand": 100},
-      {"date": "2026-06-02", "destination_id": "D1", "demand": 105},
-      {"date": "2026-06-03", "destination_id": "D1", "demand": 98},
-      {"date": "2026-06-04", "destination_id": "D1", "demand": 110},
-      {"date": "2026-06-05", "destination_id": "D1", "demand": 115},
-      {"date": "2026-06-06", "destination_id": "D1", "demand": 120},
-      {"date": "2026-06-07", "destination_id": "D1", "demand": 118},
-      {"date": "2026-06-08", "destination_id": "D1", "demand": 125},
-      {"date": "2026-06-09", "destination_id": "D1", "demand": 130},
-      {"date": "2026-06-10", "destination_id": "D1", "demand": 128}
-    ],
-    "model_names": ["naive_forecaster", "seasonal_forecaster", "rolling_window_forecaster"],
-    "train_ratio": 0.8,
-    "selection_metric": "wape",
-    "max_workers": 1,
-    "minimum_history_length": 10,
-    "random_seed": 42,
-    "model_params": {}
-  }'
-```
-
 ### Example: `/plan`
 
 ```bash
@@ -269,36 +241,49 @@ curl -X POST http://localhost:8000/plan \
   -H "Content-Type: application/json" \
   -d '{
     "demand_history": [
-      {"date": "2026-06-01", "destination_id": "D1", "demand": 100},
-      {"date": "2026-06-02", "destination_id": "D1", "demand": 105},
-      {"date": "2026-06-03", "destination_id": "D1", "demand": 98},
-      {"date": "2026-06-04", "destination_id": "D1", "demand": 110},
-      {"date": "2026-06-05", "destination_id": "D1", "demand": 115},
-      {"date": "2026-06-06", "destination_id": "D1", "demand": 120},
-      {"date": "2026-06-07", "destination_id": "D1", "demand": 118},
-      {"date": "2026-06-08", "destination_id": "D1", "demand": 125},
-      {"date": "2026-06-09", "destination_id": "D1", "demand": 130},
-      {"date": "2026-06-10", "destination_id": "D1", "demand": 128}
+      {"date":"2026-06-01","destination_id":"D1","demand":100},
+      {"date":"2026-06-02","destination_id":"D1","demand":105},
+      {"date":"2026-06-03","destination_id":"D1","demand":110},
+      {"date":"2026-06-04","destination_id":"D1","demand":115},
+      {"date":"2026-06-05","destination_id":"D1","demand":120},
+      {"date":"2026-06-06","destination_id":"D1","demand":125},
+      {"date":"2026-06-07","destination_id":"D1","demand":130},
+      {"date":"2026-06-08","destination_id":"D1","demand":135},
+      {"date":"2026-06-09","destination_id":"D1","demand":140},
+      {"date":"2026-06-10","destination_id":"D1","demand":145},
+      {"date":"2026-06-01","destination_id":"D2","demand":50},
+      {"date":"2026-06-02","destination_id":"D2","demand":55},
+      {"date":"2026-06-03","destination_id":"D2","demand":60},
+      {"date":"2026-06-04","destination_id":"D2","demand":65},
+      {"date":"2026-06-05","destination_id":"D2","demand":70},
+      {"date":"2026-06-06","destination_id":"D2","demand":75},
+      {"date":"2026-06-07","destination_id":"D2","demand":80},
+      {"date":"2026-06-08","destination_id":"D2","demand":85},
+      {"date":"2026-06-09","destination_id":"D2","demand":90},
+      {"date":"2026-06-10","destination_id":"D2","demand":95}
     ],
     "origins": [
-      {"origin_id": "O1", "daily_capacity": 200.0},
-      {"origin_id": "O2", "daily_capacity": 150.0}
+      {"origin_id":"O1","daily_capacity":200},
+      {"origin_id":"O2","daily_capacity":200}
     ],
     "lanes": [
-      {"origin_id": "O1", "destination_id": "D1", "unit_cost": 1.5},
-      {"origin_id": "O2", "destination_id": "D1", "unit_cost": 2.0}
+      {"origin_id":"O1","destination_id":"D1","unit_cost":1},
+      {"origin_id":"O1","destination_id":"D2","unit_cost":10},
+      {"origin_id":"O2","destination_id":"D1","unit_cost":10},
+      {"origin_id":"O2","destination_id":"D2","unit_cost":1}
     ],
     "destinations": [
-      {"destination_id": "D1"}
+      {"destination_id":"D1"},
+      {"destination_id":"D2"}
     ],
-    "model_names": ["naive_forecaster", "seasonal_forecaster", "rolling_window_forecaster"],
+    "model_names": ["naive_forecaster"],
     "train_ratio": 0.8,
     "selection_metric": "wape",
     "max_workers": 1,
     "minimum_history_length": 10,
     "random_seed": 42,
     "model_params": {},
-    "initial_inventory": {"D1": 50.0}
+    "initial_inventory": {}
   }'
 ```
 
