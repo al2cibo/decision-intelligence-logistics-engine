@@ -288,36 +288,72 @@ curl -X POST http://localhost:8000/plan \
 ```
 
 ---
-
 ## Example Output
 
-Running the per-destination pipeline on synthetic data with 4 destinations:
+The `/plan` endpoint executes the complete decision pipeline:
 
-```
-Destination D01  -> Best model: seasonal_forecaster  (WAPE: 0.027)
-Destination D02  -> Best model: ma_7_forecaster      (WAPE: 0.063)
-Destination D03  -> Best model: ma_7_forecaster      (WAPE: 0.180)
-Destination D04  -> Best model: ma_7_forecaster      (WAPE: 0.067)
+```text
+Historical Demand
+        ↓
+Forecasting
+        ↓
+Demand Forecast
+        ↓
+Network Optimization
+        ↓
+Shipment Plan
 ```
 
-Each destination independently selects the model best suited to its demand pattern.
+Example response:
+
+```json
+{
+  "forecast": {
+    "successful": [
+      {
+        "destination_id": "D1",
+        "best_model": "naive_forecaster",
+        "forecast": 140,
+        "wape": 0.034
+      },
+      {
+        "destination_id": "D2",
+        "best_model": "naive_forecaster",
+        "forecast": 90,
+        "wape": 0.053
+      }
+    ]
+  },
+  "optimization": {
+    "total_cost": 230,
+    "flows": [
+      {
+        "origin_id": "O1",
+        "destination_id": "D1",
+        "flow": 140
+      },
+      {
+        "origin_id": "O2",
+        "destination_id": "D2",
+        "flow": 90
+      }
+    ]
+  }
+}
+```
+
+In this example:
+
+* Destination **D1** receives a forecast demand of **140 units**
+* Destination **D2** receives a forecast demand of **90 units**
+* The optimizer routes each destination through its lowest-cost origin
+* All demand is satisfied while minimizing transportation cost
+* The resulting shipment plan has a total logistics cost of **230**
+
+This demonstrates the complete decision workflow: demand forecasting, model selection, forecast extraction, 
+and cost-optimal network planning in a single API call.
 
 ---
-
-## Design Principles
-
-- **Explicit destination isolation** — no data leakage between destinations
-- **No global model selection** — each destination has its own best model
-- **Row-order independence** — results are deterministic regardless of input ordering
-- **Fault tolerance** — one destination's failure doesn't block others
-- **Open-closed architecture** — add new models (LightGBM, Prophet, DeepAR) without modifying pipeline code
-- **Composition over inheritance** — module-level functions and protocols over deep class hierarchies
-- **Explicit contracts** — `Protocol`, `ABC`, and `__all__` declare what is public
-- **Pure functions where possible** — no hidden state mutation during computation
-- **Property-based testing** — 13 formal correctness properties verified with Hypothesis
-
----
-
 ## Testing
 
 The project uses **pytest** with **Hypothesis** for property-based testing:
