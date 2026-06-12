@@ -159,9 +159,11 @@ The key difference: single-period treats each day independently (myopic), while 
 - Stochastic demand generation
 - Scenario analysis under uncertainty
 
-### 5. Serving Layer *(interface defined)*
-- `APIInterface` ABC with `forecast` and `optimize` abstract methods
-- Ready for FastAPI endpoints for simulation, forecasting, and optimization
+### 5. Serving Layer
+- FastAPI application with `/forecast`, `/optimize`, and `/plan` endpoints
+- `APIInterface` ABC decouples the HTTP layer from the forecasting and optimization engines
+- `LogisticsAPI` concrete implementation wiring `PerDestinationPipeline` and `MultiPeriodOptimizer`
+- Pydantic request/response models for automatic JSON validation and serialization
 
 ---
 
