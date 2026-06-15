@@ -1,8 +1,6 @@
-"""Optimization layer: minimum-cost transportation LP solver."""
+"""Optimization layer: multi-period transportation LP solver."""
 
-from .optimizer import Optimizer, OptimizationResult
-from .multi_period_optimizer import MultiPeriodOptimizer
-from .multi_period_result import MultiPeriodResult
+from .multi_period import MultiPeriodOptimizer, MultiPeriodResult
 from .validation import (
     validate_not_empty,
     validate_columns,
@@ -14,8 +12,6 @@ from .validation import (
 )
 
 __all__ = [
-    "Optimizer",
-    "OptimizationResult",
     "MultiPeriodOptimizer",
     "MultiPeriodResult",
     "validate_not_empty",

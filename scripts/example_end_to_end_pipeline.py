@@ -23,8 +23,7 @@ from data.processing.data_processor import DataProcessor
 from forecasting.pipeline.pipeline_factory import create_per_destination_pipeline_from_config
 from forecasting.pipeline.per_destination_pipeline import AggregatedPipelineResult
 
-from optimization.multi_period_optimizer import MultiPeriodOptimizer
-from optimization.multi_period_result import MultiPeriodResult
+from optimization import MultiPeriodOptimizer, MultiPeriodResult
 
 from utils.config import load_config, PerDestinationConfig
 from utils.system_paths import get_project_root

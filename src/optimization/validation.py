@@ -1,9 +1,8 @@
 """Shared validation functions for transportation optimization.
 
-This module provides reusable input validation logic used by both the
-single-period :class:`Optimizer` and the :class:`MultiPeriodOptimizer`.
-Each function raises ``ValueError`` with a descriptive message when
-validation fails.
+This module provides reusable input validation logic used by the
+:class:`MultiPeriodOptimizer`. Each function raises ``ValueError`` with a
+descriptive message when validation fails.
 """
 
 import polars as pl

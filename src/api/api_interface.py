@@ -6,7 +6,7 @@ from datetime import date
 import polars as pl
 
 from forecasting.pipeline.per_destination_pipeline import AggregatedPipelineResult
-from optimization.multi_period_result import MultiPeriodResult
+from optimization import MultiPeriodResult
 
 
 class APIInterface(ABC):
