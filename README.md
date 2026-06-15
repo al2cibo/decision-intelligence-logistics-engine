@@ -93,28 +93,9 @@ Input DataFrame (date, destination_id, demand)
     └── Aggregate results → AggregatedPipelineResult
 ```
 
-### Optimization Layer: Single-Period vs Multi-Period
+### Optimization Layer: Multi-Period Transportation Optimization
 
-The optimization layer solves minimum-cost transportation problems to allocate supply from origins to destinations. It supports two modes through a unified `OptimizerInterface`:
-
-**Single-Period Optimization** — answers: *"Given today's demand, how should we allocate supply right now?"*
-
-```
-Inputs:
-  - demand_df:  [destination_id, demand]         (point-in-time demand)
-  - origins_df: [origin_id, daily_capacity]
-  - lanes_df:   [origin_id, destination_id, unit_cost]
-
-Objective: minimize Σ unit_cost(o,d) × flow(o,d)
-Subject to:
-  - Demand satisfaction:  Σ_o flow(o,d) ≥ demand(d)     ∀ destinations
-  - Capacity limits:      Σ_d flow(o,d) ≤ capacity(o)   ∀ origins
-  - Non-negativity:       flow(o,d) ≥ 0
-
-Output: OptimizationResult (flows + total_cost)
-```
-
-**Multi-Period Optimization** — answers: *"Over the next N days, how should we ship and store inventory to minimize total cost?"*
+The optimization layer solves a minimum-cost, multi-period transportation problem with inventory tracking — answering: *"Over the next N days, how should we ship and store inventory to minimize total cost?"*
 
 ```
 Inputs:
@@ -134,7 +115,14 @@ Subject to:
 Output: MultiPeriodResult (time-indexed flows + inventory levels + total_cost)
 ```
 
-The key difference: single-period treats each day independently (myopic), while multi-period jointly optimizes across the entire horizon, trading off shipping costs against holding costs and anticipating future demand.
+`MultiPeriodOptimizer` jointly optimizes across the entire planning horizon, trading off shipping costs against holding costs and anticipating future demand. It is implemented as the `src/optimization/multi_period/` package:
+
+- `optimizer.py` — `MultiPeriodOptimizer` (orchestrates the steps below)
+- `validation.py` — input validation and pre-solve feasibility checks
+- `preprocessing.py` — demand time series preprocessing
+- `model_builder.py` — LP variable/constraint/objective construction
+- `solution_extractor.py` — extracts flows and inventory from the solved LP
+- `result.py` — `MultiPeriodResult` dataclass
 
 ---
 
@@ -160,10 +148,9 @@ The key difference: single-period treats each day independently (myopic), while 
 - **Persistence interface**: abstract storage layer (ready for S3, database, filesystem)
 
 ### 3. Optimization Layer
-- **Single-period**: minimum-cost transportation LP — allocate supply to meet demand now
 - **Multi-period**: joint optimization over a planning horizon with inventory tracking and holding costs
-- Unified `OptimizerInterface` dispatches to the appropriate solver mode
-- **Shared validation module** (`optimization.validation`) — common checks used by both optimizers
+- `MultiPeriodOptimizer` (`src/optimization/multi_period/`) split into validation, preprocessing, model-building, and solution-extraction submodules
+- **Shared validation module** (`optimization.validation`) — common checks reused by the multi-period validation layer
 - OR-Tools backend (GLOP for LP, CBC for MIP)
 - Capacity-constrained origin-to-destination flow assignment
 - Pre-solve feasibility checks (unreachable destinations, insufficient capacity, negative costs, non-positive capacities)
@@ -378,7 +365,7 @@ The project uses **pytest** with **Hypothesis** for property-based testing:
 
 ```bash
 python -m pytest tests/ -v
-# 188 passed
+# 173 passed
 ```
 
 Key correctness properties verified:
