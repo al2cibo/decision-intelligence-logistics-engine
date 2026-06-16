@@ -6,7 +6,12 @@ from forecasting.models.base_forecaster import BaseForecaster
 
 
 class ModelRegistry:
-    """Maps model names to factory callables. Preserves insertion order."""
+    """Maps model names to factory callables. Preserves insertion order.
+
+    It does exist because model selection is config-driven (YAML string names, not class
+    references). The registry provides the string→class lookup and validates all
+    names at pipeline startup — before any destination is processed.
+    """
 
     def __init__(self) -> None:
         self._factories: dict[str, Callable[..., BaseForecaster]] = {}
