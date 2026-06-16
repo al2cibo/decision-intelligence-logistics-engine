@@ -22,6 +22,26 @@ INVENTORY_SCHEMA = {
 }
 
 
+def extract_transportation_cost(flow_vars: FlowVars, lanes_list: list[dict]) -> float:
+    """Sum unit_cost × flow over all lane-period combinations."""
+    cost_map = {
+        (lane["origin_id"], lane["destination_id"]): lane["unit_cost"]
+        for lane in lanes_list
+    }
+    return sum(
+        cost_map.get((o_id, d_id), 0.0) * var.solution_value()
+        for (o_id, d_id, _t), var in flow_vars.items()
+    )
+
+
+def extract_holding_cost(inv_vars: InventoryVars, holding_cost_map: dict[str, float]) -> float:
+    """Sum holding_cost × inventory over all destination-period combinations."""
+    return sum(
+        holding_cost_map.get(d_id, 0.0) * var.solution_value()
+        for (d_id, _t), var in inv_vars.items()
+    )
+
+
 def extract_flows(flow_vars: FlowVars) -> pl.DataFrame:
     """Extract a flows DataFrame, keeping only flows above ``FLOW_THRESHOLD``."""
     flow_records = [

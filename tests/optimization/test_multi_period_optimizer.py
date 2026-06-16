@@ -499,6 +499,11 @@ class TestIntegrationEndToEnd:
         # Verify total cost matches hand-computed optimal
         assert result.total_cost == pytest.approx(150.0, abs=1e-6)
 
+        # Verify cost breakdown: no holding cost, so all cost is transportation
+        assert result.transportation_cost == pytest.approx(150.0, abs=1e-4)
+        assert result.holding_cost == pytest.approx(0.0, abs=1e-6)
+        assert result.transportation_cost + result.holding_cost == pytest.approx(result.total_cost, abs=1e-4)
+
         # Verify flows DataFrame is non-empty and has correct schema
         assert not result.flows.is_empty()
         assert set(result.flows.columns) == {"origin_id", "destination_id", "period", "flow"}
@@ -548,4 +553,76 @@ class TestIntegrationEndToEnd:
 
         # Verify all inventory values are non-negative
         assert (result.inventory["inventory"] >= -1e-6).all()
+
+
+# ---------------------------------------------------------------------------
+# Tests: Cost breakdown (transportation_cost + holding_cost)
+# ---------------------------------------------------------------------------
+
+
+class TestCostBreakdown:
+    """Verify transportation_cost and holding_cost fields on MultiPeriodResult."""
+
+    def test_no_holding_cost_column_breakdown(self):
+        """When destinations_df has no holding_cost column, holding_cost == 0."""
+        planning_horizon = [date(2024, 1, 1), date(2024, 1, 2)]
+        demand_ts = pl.DataFrame({
+            "destination_id": ["D1", "D1"],
+            "date": planning_horizon,
+            "demand": [10.0, 10.0],
+        })
+        origins_df = pl.DataFrame({"origin_id": ["O1"], "daily_capacity": [100.0]})
+        lanes_df = pl.DataFrame({"origin_id": ["O1"], "destination_id": ["D1"], "unit_cost": [3.0]})
+        destinations_df = pl.DataFrame({"destination_id": ["D1"]})  # no holding_cost column
+
+        result = MultiPeriodOptimizer().solve(
+            demand_ts, origins_df, lanes_df, destinations_df, planning_horizon
+        )
+
+        assert result.holding_cost == pytest.approx(0.0, abs=1e-6)
+        assert result.transportation_cost == pytest.approx(result.total_cost, abs=1e-4)
+        # 20 units × cost 3 = 60
+        assert result.transportation_cost == pytest.approx(60.0, abs=1e-4)
+
+    def test_holding_cost_incurred_when_capacity_forces_early_shipment(self):
+        """When capacity forces over-shipment in period 1, holding cost is non-zero.
+
+        Setup: 1 origin (capacity=10), 1 destination, 2 periods.
+        Demand: period 1 = 5, period 2 = 15. Total = 20 = total capacity (10 × 2).
+        The only feasible solution is ship 10 in each period, leaving 5 units in
+        inventory after period 1.
+          transport_cost = (10 + 10) × unit_cost(2) = 40
+          holding_cost   = 5 × holding_cost(1)      = 5
+          total_cost     = 45
+        """
+        planning_horizon = [date(2024, 1, 1), date(2024, 1, 2)]
+        demand_ts = pl.DataFrame({
+            "destination_id": ["D1", "D1"],
+            "date": planning_horizon,
+            "demand": [5.0, 15.0],
+        })
+        origins_df = pl.DataFrame({"origin_id": ["O1"], "daily_capacity": [10.0]})
+        lanes_df = pl.DataFrame({"origin_id": ["O1"], "destination_id": ["D1"], "unit_cost": [2.0]})
+        destinations_df = pl.DataFrame({"destination_id": ["D1"], "holding_cost": [1.0]})
+
+        result = MultiPeriodOptimizer().solve(
+            demand_ts, origins_df, lanes_df, destinations_df, planning_horizon
+        )
+
+        assert result.total_cost == pytest.approx(45.0, abs=1e-4)
+        assert result.transportation_cost == pytest.approx(40.0, abs=1e-4)
+        assert result.holding_cost == pytest.approx(5.0, abs=1e-4)
+        assert result.transportation_cost + result.holding_cost == pytest.approx(result.total_cost, abs=1e-4)
+
+    def test_breakdown_sums_to_total_cost_with_holding(
+        self, valid_demand_ts, valid_origins_df, valid_lanes_df, valid_destinations_df, valid_planning_horizon
+    ):
+        """transportation_cost + holding_cost == total_cost for any valid solve."""
+        result = MultiPeriodOptimizer().solve(
+            valid_demand_ts, valid_origins_df, valid_lanes_df, valid_destinations_df, valid_planning_horizon
+        )
+
+        assert result.transportation_cost >= 0.0
+        assert result.holding_cost >= 0.0
+        assert result.transportation_cost + result.holding_cost == pytest.approx(result.total_cost, abs=1e-4)
 

@@ -1227,7 +1227,7 @@ def test_objective_value_consistency(problem):
     # Use tolerance that accounts for filtered flow contributions
     tolerance = max(1e-6, max_filtered_cost)
 
-    assert abs(result.total_cost - computed_cost) < tolerance, (
+    assert abs(result.total_cost - computed_cost) <= tolerance, (
         f"Objective value inconsistency:\n"
         f"  result.total_cost = {result.total_cost}\n"
         f"  computed_cost = {computed_cost}\n"
@@ -1235,6 +1235,25 @@ def test_objective_value_consistency(problem):
         f"  holding_cost = {holding_cost_total}\n"
         f"  difference = {abs(result.total_cost - computed_cost)}\n"
         f"  tolerance = {tolerance}"
+    )
+
+    # Also verify the breakdown fields on the result
+    assert abs(result.transportation_cost - transport_cost) <= tolerance, (
+        f"transportation_cost mismatch:\n"
+        f"  result.transportation_cost = {result.transportation_cost}\n"
+        f"  computed transport_cost = {transport_cost}\n"
+        f"  difference = {abs(result.transportation_cost - transport_cost)}"
+    )
+    assert abs(result.holding_cost - holding_cost_total) <= 1e-6, (
+        f"holding_cost mismatch:\n"
+        f"  result.holding_cost = {result.holding_cost}\n"
+        f"  computed holding_cost_total = {holding_cost_total}\n"
+        f"  difference = {abs(result.holding_cost - holding_cost_total)}"
+    )
+    assert result.transportation_cost + result.holding_cost == pytest.approx(result.total_cost, abs=tolerance), (
+        f"transportation_cost + holding_cost != total_cost:\n"
+        f"  {result.transportation_cost} + {result.holding_cost} = "
+        f"{result.transportation_cost + result.holding_cost} vs {result.total_cost}"
     )
 
 

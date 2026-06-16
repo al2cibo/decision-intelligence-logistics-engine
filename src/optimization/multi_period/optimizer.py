@@ -9,7 +9,7 @@ from ortools.linear_solver import pywraplp
 from .model_builder import build_lookups, create_variables, add_constraints, set_objective
 from .preprocessing import preprocess_demand
 from .result import MultiPeriodResult
-from .solution_extractor import extract_flows, extract_inventory
+from .solution_extractor import extract_flows, extract_holding_cost, extract_inventory, extract_transportation_cost
 from .validation import MAX_VARIABLES, check_feasibility, validate_inputs
 
 logger = logging.getLogger(__name__)
@@ -108,8 +108,16 @@ class MultiPeriodOptimizer:
         total_cost = solver.Objective().Value()
         flows_df = extract_flows(flow_vars)
         inventory_df = extract_inventory(inv_vars, lookups.destinations, planning_horizon)
+        transportation_cost = extract_transportation_cost(flow_vars, lookups.lanes_list)
+        holding_cost = extract_holding_cost(inv_vars, lookups.holding_cost_map)
 
-        return MultiPeriodResult(flows=flows_df, inventory=inventory_df, total_cost=total_cost)
+        return MultiPeriodResult(
+            flows=flows_df,
+            inventory=inventory_df,
+            total_cost=total_cost,
+            transportation_cost=transportation_cost,
+            holding_cost=holding_cost,
+        )
 
     @staticmethod
     def _preprocess_demand(demand_ts: pl.DataFrame, planning_horizon: list[date]) -> pl.DataFrame:
