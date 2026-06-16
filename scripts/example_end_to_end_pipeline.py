@@ -20,8 +20,7 @@ import polars as pl
 from data.ingestion import Reader
 from data.processing.data_processor import DataProcessor
 
-from forecasting.pipeline.pipeline_factory import create_per_destination_pipeline_from_config
-from forecasting.pipeline.per_destination_pipeline import AggregatedPipelineResult
+from forecasting import create_per_destination_pipeline_from_config, AggregatedPipelineResult
 
 from optimization import MultiPeriodOptimizer, MultiPeriodResult
 
@@ -94,54 +93,6 @@ def run_per_destination_forecasting(
         )
 
     return result
-
-
-# ---------------------------------------------------------------------
-# Demand extraction
-# ---------------------------------------------------------------------
-def extract_demand_time_series(result: AggregatedPipelineResult) -> pl.DataFrame:
-    """Build a [destination_id, date, demand] DataFrame from each destination's
-    selected model forecast values (covering the test period).
-
-    Destinations that failed or whose selected ForecastResult is missing
-    are excluded with a warning.
-    """
-    frames = []
-
-    for outcome in result.successful:
-        selected_name = outcome.selected.model_name
-        selected_fr = next(
-            (fr for fr in outcome.results if fr.model_name == selected_name), None
-        )
-        if selected_fr is None:
-            logger.warning(
-                "No ForecastResult found for selected model '%s' at destination '%s'. Skipping.",
-                selected_name,
-                outcome.destination_id,
-            )
-            continue
-
-        # forecast_values has schema [date: Date, forecast: Float64]
-        dest_df = (
-            selected_fr.forecast_values
-            .with_columns(pl.lit(outcome.destination_id).alias("destination_id"))
-            .rename({"forecast": "demand"})
-            .select(["destination_id", "date", "demand"])
-        )
-        frames.append(dest_df)
-
-    if not frames:
-        raise ValueError(
-            "No forecast data available — all destinations failed or had no results."
-        )
-
-    demand_ts = pl.concat(frames).sort(["destination_id", "date"])
-    logger.info(
-        "Extracted demand time series: %d rows across %d destinations",
-        demand_ts.height,
-        demand_ts["destination_id"].n_unique(),
-    )
-    return demand_ts
 
 
 # ---------------------------------------------------------------------
@@ -229,7 +180,12 @@ def main():
     )
 
     # --- Extract test-period forecasts as demand time series ---
-    demand_ts = extract_demand_time_series(forecast_result)
+    demand_ts = forecast_result.to_demand_dataframe()
+    logger.info(
+        "Extracted demand time series: %d rows across %d destinations",
+        demand_ts.height,
+        demand_ts["destination_id"].n_unique(),
+    )
 
     # --- Multi-period optimization ---
     opt_result = run_multi_period_optimization(

@@ -52,6 +52,38 @@ class AggregatedPipelineResult:
         """Outcomes where processing failed (all models errored or insufficient data)."""
         return [o for o in self.outcomes if not o.success]
 
+    def to_demand_dataframe(self) -> pl.DataFrame:
+        """Return selected forecast values as a ``[destination_id, date, demand]`` DataFrame.
+
+        Covers the validation window of the winning model for each successful destination.
+        Failed destinations are silently excluded. Raises ``ValueError`` if no successful
+        outcomes exist.
+        """
+        frames = []
+        for outcome in self.successful:
+            selected_fr = next(
+                (fr for fr in outcome.results if fr.model_name == outcome.selected.model_name),
+                None,
+            )
+            if selected_fr is None:
+                logger.warning(
+                    "No ForecastResult found for selected model '%s' at destination '%s'. Skipping.",
+                    outcome.selected.model_name,
+                    outcome.destination_id,
+                )
+                continue
+            frames.append(
+                selected_fr.forecast_values
+                .with_columns(pl.lit(outcome.destination_id).alias("destination_id"))
+                .rename({"forecast": "demand"})
+                .select(["destination_id", "date", "demand"])
+            )
+        if not frames:
+            raise ValueError(
+                "No forecast data available — all destinations failed or had no results."
+            )
+        return pl.concat(frames).sort(["destination_id", "date"])
+
 
 class PerDestinationPipeline:
     """Trains, evaluates, and selects a forecasting model independently per destination.

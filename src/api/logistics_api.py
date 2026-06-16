@@ -5,8 +5,7 @@ from datetime import date
 import polars as pl
 
 from api.api_interface import APIInterface
-from forecasting.pipeline.per_destination_pipeline import AggregatedPipelineResult
-from forecasting.pipeline.pipeline_factory import create_per_destination_pipeline_from_config
+from forecasting import AggregatedPipelineResult, create_per_destination_pipeline_from_config
 from optimization import MultiPeriodOptimizer, MultiPeriodResult
 from utils.config import PerDestinationConfig
 
