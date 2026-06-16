@@ -1,6 +1,7 @@
-"""
-ETS (Exponential Smoothing) forecaster wrapping statsmodels Holt-Winters
-ExponentialSmoothing. Supports configurable trend and seasonal components.
+"""ETS (Exponential Smoothing) forecaster wrapping statsmodels Holt-Winters.
+
+Supports configurable trend and seasonal components. When neither is set the
+model reduces to simple exponential smoothing.
 """
 
 import numpy as np
@@ -11,6 +12,24 @@ from forecasting.models.base_forecaster import BaseForecaster
 
 
 class ETSForecaster(BaseForecaster):
+    """Holt-Winters exponential smoothing forecaster.
+
+    Fits on the training series and produces in-sample fitted values for the
+    test window. If the test window extends beyond the training length, the
+    model appends out-of-sample forecasts.
+
+    Parameters
+    ----------
+    target_col : str
+        Name of the demand column. Defaults to ``"demand"``.
+    trend : str | None
+        Trend component: ``"add"``, ``"mul"``, or ``None``. Defaults to ``"add"``.
+    seasonal : str | None
+        Seasonal component: ``"add"``, ``"mul"``, or ``None``. Defaults to ``None``.
+    seasonal_periods : int | None
+        Number of periods in a seasonal cycle. Required when ``seasonal`` is set.
+        Defaults to ``None``.
+    """
 
     def __init__(
         self,
@@ -28,12 +47,12 @@ class ETSForecaster(BaseForecaster):
         self._train_length = 0
 
     @property
-    def name(self):
+    def name(self) -> str:
         return "ets_forecaster"
 
-    def fit(self, df: pl.DataFrame):
+    def fit(self, df: pl.DataFrame) -> None:
         if self.target_col not in df.columns:
-            raise ValueError(f"{self.target_col} not in dataframe")
+            raise ValueError(f"Column '{self.target_col}' not found in DataFrame")
 
         y = df[self.target_col].to_numpy().astype(float)
         self._train_length = len(y)
@@ -47,8 +66,10 @@ class ETSForecaster(BaseForecaster):
         self._fitted_result = model.fit()
 
     def predict(self, df: pl.DataFrame) -> pl.DataFrame:
+        if self._fitted_result is None:
+            raise RuntimeError("fit() must be called before predict()")
         if self.target_col not in df.columns:
-            raise ValueError(f"{self.target_col} not in dataframe")
+            raise ValueError(f"Column '{self.target_col}' not found in DataFrame")
 
         n = len(df)
         fitted_vals = self._fitted_result.fittedvalues

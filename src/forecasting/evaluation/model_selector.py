@@ -1,44 +1,27 @@
-"""Unified model selection for choosing the best forecasting model.
-
-Provides a single ``ModelSelector`` class that supports two input modes:
-
-- **DataFrame mode** (legacy pipeline): accepts a ``pl.DataFrame`` with a
-  ``model_name`` column and metric columns.
-- **Tuple-list mode** (per-destination pipeline): accepts a list of
-  ``(model_name, metrics_dict)`` tuples.
-
-Both modes select the model with the lowest value for a configurable metric,
-skip NaN/null entries, and break ties by first-in-order.
-"""
+"""Model selection: choose the best forecasting model by minimising a metric."""
 
 import logging
 import math
-
-import polars as pl
 
 logger = logging.getLogger(__name__)
 
 
 class ModelSelector:
-    """Select the best forecasting model by minimising a configurable metric.
+    """Selects the best forecasting model from an ordered list of candidates.
 
-    Supports two input modes:
-
-    - DataFrame mode (legacy pipeline): accepts ``pl.DataFrame`` with a
-      ``model_name`` column.
-    - Tuple-list mode (per-destination pipeline): accepts a list of
-      ``(name, metrics)`` tuples.
+    Given a list of ``(model_name, metrics_dict)`` tuples, returns the model
+    with the lowest value for the configured metric. NaN and None values are
+    skipped. Ties are broken by insertion order (first wins).
 
     Parameters
     ----------
-    metric : str, optional
-        The metric name to minimise. Must be one of ``VALID_METRICS``.
-        Defaults to ``"wape"``.
+    metric : str
+        Metric to minimise. Must be one of ``VALID_METRICS``. Defaults to ``"wape"``.
 
     Raises
     ------
     ValueError
-        If *metric* is not in ``VALID_METRICS``.
+        If ``metric`` is not in ``VALID_METRICS``.
 
     Examples
     --------
@@ -66,19 +49,17 @@ class ModelSelector:
         Parameters
         ----------
         model_metrics : list[tuple[str, dict[str, float]]]
-            Ordered list of ``(model_name, metrics_dict)`` pairs. Input order
-            determines tiebreaking (first wins).
+            Ordered list of ``(model_name, metrics_dict)`` pairs.
 
         Returns
         -------
         tuple[str, dict[str, float]]
-            A tuple of ``(model_name, metrics_dict)`` for the best model.
+            ``(model_name, metrics_dict)`` for the winning model.
 
         Raises
         ------
         ValueError
-            If no valid (non-null, non-NaN) metric values exist for the
-            configured metric across all models.
+            If no valid (non-null, non-NaN) metric values exist.
         """
         best_name: str | None = None
         best_value: float | None = None
@@ -86,15 +67,8 @@ class ModelSelector:
 
         for model_name, metrics in model_metrics:
             value = metrics.get(self.metric)
-
-            # Skip None values
-            if value is None:
+            if value is None or (isinstance(value, float) and math.isnan(value)):
                 continue
-
-            # Skip NaN values
-            if isinstance(value, float) and math.isnan(value):
-                continue
-
             if best_value is None or value < best_value:
                 best_name = model_name
                 best_value = value
@@ -102,10 +76,8 @@ class ModelSelector:
 
         if best_name is None:
             raise ValueError(
-                f"No valid (non-null, non-NaN) values for metric "
-                f"'{self.metric}' across all models. "
-                f"Cannot perform model selection."
+                f"No valid (non-null, non-NaN) values for metric '{self.metric}' "
+                f"across all models. Cannot perform model selection."
             )
 
-        return (best_name, best_metrics)
-
+        return best_name, best_metrics

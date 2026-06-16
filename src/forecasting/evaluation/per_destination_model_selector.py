@@ -1,4 +1,4 @@
-"""Per-destination model selection for choosing the best forecasting model."""
+"""Per-destination model selection wrapper."""
 
 from dataclasses import dataclass
 
@@ -7,7 +7,7 @@ from forecasting.evaluation.model_selector import ModelSelector
 
 @dataclass(frozen=True)
 class SelectionResult:
-    """Result of model selection for a single destination."""
+    """Immutable result of model selection for a single destination."""
 
     destination_id: str
     model_name: str
@@ -15,26 +15,20 @@ class SelectionResult:
 
 
 class PerDestinationModelSelector:
-    """Selects the best model for a destination based on a configurable metric.
+    """Selects the best model for a given destination.
 
-    Delegates core selection logic to the unified
-    :class:`~forecasting.evaluation.model_selector.ModelSelector`.
+    Wraps :class:`~forecasting.evaluation.model_selector.ModelSelector` with
+    an explicit pre-validation step that raises a destination-specific error
+    when the configured metric key is absent from any model's metrics dict.
 
     Parameters
     ----------
-    metric : str, optional
-        The metric name to minimise. Must be one of ``VALID_METRICS``.
+    metric : str
+        Metric to minimise. Must be one of ``ModelSelector.VALID_METRICS``.
         Defaults to ``"wape"``.
-
-    Raises
-    ------
-    ValueError
-        If *metric* is not in ``VALID_METRICS``.
     """
 
-    VALID_METRICS = {"wape", "mae", "rmse", "mape", "mse"}
-
-    def __init__(self, metric: str = "wape"):
+    def __init__(self, metric: str = "wape") -> None:
         self._selector = ModelSelector(metric=metric)
         self.metric = self._selector.metric
 
@@ -43,49 +37,40 @@ class PerDestinationModelSelector:
         destination_id: str,
         model_metrics: list[tuple[str, dict[str, float]]],
     ) -> SelectionResult:
-        """Select best model from ordered list of (model_name, metrics) tuples.
+        """Select the best model for a destination.
 
         Parameters
         ----------
         destination_id : str
-            The destination being evaluated.
+            Identifier for the destination being evaluated.
         model_metrics : list[tuple[str, dict[str, float]]]
-            Ordered list of (model_name, metrics_dict) pairs.
-            Order determines tiebreaking (first wins).
+            Ordered list of ``(model_name, metrics_dict)`` pairs.
 
         Returns
         -------
         SelectionResult
-            The selection outcome containing destination_id, model_name,
-            and the full metrics dictionary for the winning model.
+            The winning model and its full metrics dict.
 
         Raises
         ------
         ValueError
-            If the metric name is not present in the metrics dicts, or if no
-            valid (non-null, non-NaN) metric values exist for selection.
+            If the metric key is absent from any model's dict, or if no
+            valid metric values exist for selection.
         """
-        # Pre-validate that the metric key exists in each model's metrics dict.
-        # The unified selector uses .get() which silently skips missing keys,
-        # but the per-destination contract requires an explicit error.
         for model_name, metrics in model_metrics:
             if self.metric not in metrics:
                 raise ValueError(
                     f"Metric '{self.metric}' not found in metrics for model "
-                    f"'{model_name}'. Available: {sorted(metrics.keys())}"
+                    f"'{model_name}' at destination '{destination_id}'. "
+                    f"Available: {sorted(metrics.keys())}"
                 )
 
         try:
-            best_name, best_metrics = self._selector.select_best_from_tuples(
-                model_metrics
-            )
+            best_name, best_metrics = self._selector.select_best_from_tuples(model_metrics)
         except ValueError:
-            # Re-raise with destination-specific message to preserve the
-            # original error contract.
             raise ValueError(
                 f"No valid (non-null, non-NaN) values for metric '{self.metric}' "
-                f"across all models for destination '{destination_id}'. "
-                f"Cannot perform model selection."
+                f"across all models for destination '{destination_id}'."
             )
 
         return SelectionResult(
