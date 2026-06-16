@@ -20,6 +20,11 @@ class PerDestinationModelSelector:
     Wraps :class:`~forecasting.evaluation.model_selector.ModelSelector` with
     an explicit pre-validation step that raises a destination-specific error
     when the configured metric key is absent from any model's metrics dict.
+    
+    TLDR: ModelSelector is the core class that, given a list of 
+    ``(model_name, metrics_dict)`` tuples, returns the model with the 
+    lowest value for the configured metric. PerDestinationModelSelector
+    works as a wrapper, tying the model selection to each single destination.
 
     Parameters
     ----------
