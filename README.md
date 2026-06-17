@@ -90,7 +90,7 @@ Input DataFrame (date, destination_id, demand)
     │   │   └── Evaluate (WAPE, MAE, RMSE, MAPE, MSE)
     │   └── Select best model (minimize configurable metric)
     │
-    └── Aggregate results → AggregatedPipelineResult
+    └── Aggregate results → AggregatedForecastingResult
 ```
 
 ### Optimization Layer: Multi-Period Transportation Optimization
@@ -129,7 +129,7 @@ Output: MultiPeriodResult (time-indexed flows + inventory levels + total_cost)
 ## Core Components
 
 ### 1. Data Layer
-- Synthetic logistics data generation (dedicated `scripts/synthetic_data.py` module)
+- Synthetic logistics data generation (`scripts/generate_data.py`, also used to populate `experiments/datasets/`)
 - Data processing with Polars via module-level validation functions
 - Efficient storage in Parquet format
 - Explicit `__all__` exports in all packages
@@ -137,15 +137,14 @@ Output: MultiPeriodResult (time-indexed flows + inventory levels + total_cost)
 ### 2. Forecasting Layer
 - **Per-destination model training** — one model per destination, independently selected
 - **Model Registry** — factory pattern for dynamic model instantiation
-- **Unified ModelSelector** — single implementation supporting both DataFrame and tuple-list inputs, with NaN handling and first-in-order tiebreaking
-- **Supported models**: Naive, Seasonal Naive, Rolling Window (Moving Average), ETS, ARIMA/SARIMAX
+- **Unified ModelSelector** — selects best model by configurable metric from `(name, metrics)` tuples, with NaN handling and first-in-order tiebreaking
+- **Supported models**: Naive, Seasonal Naive, Rolling Window (Moving Average), ETS, SARIMAX
 - **Evaluation**: WAPE, MAE, RMSE, MAPE, MSE per destination per model (pure, side-effect-free)
 - **Model selection**: automatic best-model selection per destination by configurable metric
-- **Pipeline Protocol**: `PipelineProtocol` (structural subtyping) — both `ForecastingPipeline` and `PerDestinationPipeline` conform
+- **Pipeline Protocol**: `ForecastingPipelineProtocol` (structural subtyping via `@runtime_checkable Protocol`) — `PerDestinationForecastingPipeline` conforms
 - **Parallel execution**: joblib-based parallelism across destinations (configurable workers)
 - **Fault tolerance**: individual destination failures don't block the pipeline
 - **Reproducibility**: deterministic results regardless of row ordering or parallelism level
-- **Persistence interface**: abstract storage layer (ready for S3, database, filesystem)
 
 ### 3. Optimization Layer
 - **Multi-period**: joint optimization over a planning horizon with inventory tracking and holding costs
@@ -165,7 +164,7 @@ Output: MultiPeriodResult (time-indexed flows + inventory levels + total_cost)
 ### 5. Serving Layer
 - FastAPI application with `/forecast`, `/optimize`, and `/plan` endpoints
 - `APIInterface` ABC decouples the HTTP layer from the forecasting and optimization engines
-- `LogisticsAPI` concrete implementation wiring `PerDestinationPipeline` and `MultiPeriodOptimizer`
+- `LogisticsAPI` concrete implementation wiring `PerDestinationForecastingPipeline` and `MultiPeriodOptimizer`
 - Pydantic request/response models for automatic JSON validation and serialization
 
 ---
@@ -365,7 +364,7 @@ The project uses **pytest** with **Hypothesis** for property-based testing:
 
 ```bash
 python -m pytest tests/ -v
-# 173 passed
+# 162 passed
 ```
 
 Key correctness properties verified:
