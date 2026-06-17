@@ -20,9 +20,9 @@ class MultiPeriodResult:
     total_cost : float
         The minimised total cost (transportation + holding); equals the LP objective value.
     transportation_cost : float
-        The transportation component: sum of unit_cost[o,d] × flow[o,d,t] over all lanes and periods.
+        Sum of unit_cost[o,d] × flow[o,d,t] over all lanes and periods.
     holding_cost : float
-        The holding component: sum of holding_cost[d] × inventory[d,t] over all destinations and periods.
+        Sum of holding_cost[d] × inventory[d,t] over all destinations and periods.
         Zero when destinations_df has no holding_cost column.
     """
 

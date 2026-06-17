@@ -47,7 +47,6 @@ class MultiPeriodOptimizer:
     MAX_VARIABLES = MAX_VARIABLES
 
     def __init__(self, solver_name: str = "GLOP") -> None:
-        """Initialize with solver backend selection."""
         if solver_name not in self.SUPPORTED_SOLVERS:
             raise ValueError(
                 f"Unsupported solver '{solver_name}'. "

@@ -1,6 +1,7 @@
 """Optimization layer: multi-period transportation LP solver."""
 
-from .multi_period import MultiPeriodOptimizer, MultiPeriodResult
+from .optimizer import MultiPeriodOptimizer
+from .result import MultiPeriodResult
 from .validation import (
     validate_not_empty,
     validate_columns,

@@ -32,13 +32,8 @@ def preprocess_demand(
     """
     horizon_set = set(planning_horizon)
 
-    # 1. Filter out rows with dates outside planning_horizon
     demand_ts = demand_ts.filter(pl.col("date").is_in(list(horizon_set)))
-
-    # 2. Fill null demand values with 0
     demand_ts = demand_ts.with_columns(pl.col("demand").fill_null(0))
-
-    # 3. Deduplicate: sum demand for duplicate (destination_id, date) pairs
     demand_ts = demand_ts.group_by("destination_id", "date").agg(pl.col("demand").sum())
 
     return demand_ts
