@@ -198,6 +198,8 @@ class PerDestinationForecastingPipeline:
         """
         try:
             # Deterministic seed derived per destination — independent of run order
+            # The seeds are suefule for the forecasting models composed by stochastic components 
+            # (e.g. SARIMAX/ETS models).
             dest_seed = abs(hash(destination_id)) ^ self.random_seed
             np.random.seed(dest_seed % (2**32))
 
