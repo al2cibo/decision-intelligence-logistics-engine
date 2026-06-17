@@ -1,11 +1,9 @@
-"""Data layer: ingestion, generation, and processing of logistics DataFrames."""
+"""Data layer: ingestion and processing of logistics DataFrames."""
 
 from .input_data import InputData
 from .ingestion import Reader
-from .synthetic_data_generation import generate_synthetic_logistics_data
 
 __all__ = [
     "InputData",
     "Reader",
-    "generate_synthetic_logistics_data",
 ]
