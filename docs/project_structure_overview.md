@@ -1,86 +1,145 @@
 
 ### Project Structure Overview
 
-The project is organized into three main components, each with a distinct role in the system architecture.
+The project is organized into four main areas: a core Python library (`src/`), batch
+experiment infrastructure (`experiments/`), executable entry points (`scripts/`), and an
+HTTP API (`src/api/`). For a full technical reference — module maps, LP formulation,
+metric formulas — see the `.claude/` directory.
 
-### 1. Core Package (`src/`)
+---
 
-The `src/` directory contains the core logic of the system and is structured as an internal Python library.
+### 1. Core Library (`src/`)
 
-It includes:
-- data processing and pipeline logic  
-- forecasting models  
-- optimization models  
-- utility functions  
-
-This layer is designed to be modular and reusable. It does not contain executable scripts; instead, it exposes functions and classes that can be imported and used by other parts of the system.
+`src/` is an installable Python package importable as top-level modules (`data`,
+`forecasting`, `optimization`, `api`, `utils`). It contains no executable scripts.
 
 #### Data Layer (`src/data/`)
 
 Handles ingestion, validation, and processing of logistics data:
-- `Reader` — loads parquet files (demand_history, origins, destinations, lanes) from a configurable path
-- `InputData` — dataclass bundling the four DataFrames
-- `DataProcessor` — orchestrates per-dataset processors
-- `BaseProcessor` — shared validation (non-empty, no nulls, required columns)
-- Specialized processors: `DemandProcessor` (dedup + sort), `LanesProcessor`, `DestinationsProcessor`, `OriginsProcessor`
-- `generate_synthetic_logistics_data()` — creates realistic synthetic data with weekly seasonality, trend, promotions, and noise
+
+- `Reader` — loads 4 parquet files (`demand_history`, `origins`, `destinations`, `lanes`)
+  from a configurable directory into an `InputData` dataclass.
+- `DataProcessor` — orchestrates per-table processors (dedup + sort + validation).
+- Individual processors: `DemandProcessor`, `LanesProcessor`, `DestinationsProcessor`,
+  `OriginsProcessor` — each calls shared validation functions from
+  `processing/validation.py` (`validate_non_empty`, `validate_no_nulls`,
+  `validate_columns`).
+- `generate_synthetic_logistics_data()` — creates realistic synthetic logistics data
+  with weekly seasonality, trend, promotions, and noise.
 
 #### Forecasting Layer (`src/forecasting/`)
 
-Demand prediction with multiple models and automatic selection:
-- `BaseForecaster` — ABC defining the `fit()`, `predict()`, `name` interface
-- Models: NaiveForecaster, SeasonalForecaster, RollingWindowForecaster, ETSForecaster, ARIMAForecaster
-- `ForecastingPipeline` — runs all models sequentially with optional train/test split
-- `Evaluator` — computes MAE, MSE, RMSE, MAPE, WAPE
-- `ModelSelector` — picks best model by configurable metric (default WAPE)
-- `ForecastExtractor` — extracts forecast column and aggregates demand per destination
+Per-destination multi-model demand forecasting with automatic model selection:
+
+- `config.py` — **stdlib-only**. Owns `PerDestinationConfig` (the full set of
+  per-destination runtime parameters), `KNOWN_METRICS`, and
+  `_validate_per_destination_config`. No dependency on any other project module.
+- `models/` — 5 concrete forecasters, all subclassing `BaseForecaster`:
+  `NaiveForecaster`, `SeasonalForecaster`, `RollingWindowForecaster`,
+  `ETSForecaster` (Holt-Winters via statsmodels), `SARIMAXForecaster`.
+- `registry/` — `ModelRegistry` (name → factory callable) and `create_default_registry()`
+  which registers all 5 models.
+- `evaluation/` — `Evaluator` (computes MAE, MSE, RMSE, MAPE, WAPE), `ModelSelector`
+  (picks best model by metric from a list of `(name, metrics)` tuples),
+  `PerDestinationModelSelector` (wraps `ModelSelector` with per-destination validation,
+  returns frozen `SelectionResult`).
+- `results/` — frozen dataclasses `ForecastResult` (per-model outcome for one
+  destination) and `TimePeriod`.
+- `pipeline/` — the core orchestration:
+  - `PerDestinationForecastingPipeline` — fits/evaluates all models per destination
+    (joblib parallelism, per-destination fault tolerance, deterministic seeding via
+    `abs(hash(destination_id)) ^ random_seed`). Produces `AggregatedForecastingResult`
+    with `.successful` / `.failed` and `.export_forecasts()` (extracts the selected
+    model's test-period forecasts as `[destination_id, date, demand]` for the optimizer).
+  - `create_forecasting_pipeline(config: PerDestinationConfig)` — factory that
+    validates model names against the registry and builds the pipeline.
+  - `ForecastingPipelineProtocol` — `@runtime_checkable Protocol` for structural typing.
 
 #### Optimization Layer (`src/optimization/`)
 
-Minimum-cost transportation LP using OR-Tools (GLOP/CBC):
-- Decision variables: flow per origin-destination lane
-- Constraints: demand satisfaction (≥), capacity limits (≤)
-- Pre-solve feasibility checks: unreachable destinations, insufficient capacity
-- Returns `OptimizationResult` with flows DataFrame and total cost
+Minimum-cost multi-period transportation LP using OR-Tools (GLOP/CBC):
 
-#### Postprocessing (`src/postprocessing/`)
-
-- `MetricsSummary` — collects per-model metrics, normalizes schema, exports CSV
-- `VisualizationEngine` — matplotlib time series plots (actuals vs predicted)
+- `MultiPeriodOptimizer.solve(...)` — builds and solves the LP. Decision variables:
+  `flow[origin, destination, period]` and `inv[destination, period]`. Constraints:
+  inventory balance per destination/period, capacity per origin/period. Optional holding
+  costs added to objective if `destinations_df` has a `holding_cost` column.
+- Pre-solve validation: structural checks → cost/capacity checks → variable-count guard
+  (`MAX_VARIABLES = 1_000_000`) → feasibility checks.
+- Returns `MultiPeriodResult(flows, inventory, total_cost, transportation_cost,
+  holding_cost)`.
+- Implementation is split into a `multi_period/` package:
+  `optimizer.py`, `validation.py`, `preprocessing.py`, `model_builder.py`,
+  `solution_extractor.py`, `result.py`.
+- Shared `validation.py` at `src/optimization/` level — reused across modules.
 
 #### Configuration (`src/utils/`)
 
-- YAML-based config with `DataConfig` and `ForecastingConfig` dataclasses
-- `get_project_root()` for path resolution
+- `config.py` — **stdlib-only**. Owns application-level config: `DataConfig`,
+  `ForecastingConfig` (top-level metric/ratio knobs), `Config` (root dataclass),
+  `load_config(project_root, config_path)`. Does not know about `PerDestinationConfig`
+  or any forecasting internals.
+- `system_paths.py` — `get_project_root()`.
 
 ---
 
-### 2. Scripts (`scripts/`)
+### 2. Experiments (`experiments/`)
 
-The `scripts/` directory contains executable entry points used to run specific workflows.
+Batch infrastructure for running named experiment configs against a versioned dataset,
+saving results for analysis:
 
-Typical use cases include:
-- running the data pipeline  
-- generating synthetic data  
-- training models  
-- executing optimization jobs  
+- `experiment_config.py` — `ExperimentConfig` dataclass + `load_experiment_config()`.
+  Imports `PerDestinationConfig` from `forecasting.config`.
+- `run_experiment.py` — runs one experiment config end-to-end (forecast → optimize)
+  and saves 5 artifacts: `metrics.json`, `forecasts.parquet`, `flows.parquet`,
+  `inventory.parquet`, `config.yaml`.
+- `run_all.py` — runs all 3 experiment configs and prints a summary table.
+- `configs/` — 3 YAML experiment definitions:
+  `baseline_naive.yaml`, `baseline_global_ets.yaml`, `model_selection.yaml`.
+- `datasets/synthetic_v1/` — versioned input data (4 parquet files, committed to git).
+- `results/` — gitignored; populated at runtime.
 
-Scripts act as orchestrators: they import and call functions from the core package (`src/`) but do not implement core logic themselves.
-
-The main entry point is `example_end_to_end_pipeline.py`, which executes the full flow:
+Usage:
+```bash
+PYTHONPATH=src python experiments/run_experiment.py experiments/configs/model_selection.yaml
+PYTHONPATH=src python experiments/run_all.py
 ```
-Reader → DataProcessor → ForecastingPipeline → Evaluator → MetricsSummary
-  → ModelSelector → ForecastExtractor → Optimizer → Flow decisions
+
+---
+
+### 3. Scripts (`scripts/`)
+
+Executable entry points that orchestrate the core library. No core logic implemented here.
+
+- `example_end_to_end_pipeline.py` — CLI demo: ingest → forecast → optimize, using
+  `data/synthetic2/`. Constructs `PerDestinationConfig` from `forecasting.config`
+  directly (not from YAML).
+- `generate_data.py` — regenerates the `data/synthetic2/` parquet files.
+- `serve.py` — launches the FastAPI app via uvicorn with reload.
+
+---
+
+### 4. API Layer (`src/api/`)
+
+FastAPI service exposing the pipeline over HTTP. Runs as a persistent process; no
+filesystem dependency (all I/O is JSON in, JSON out).
+
+- `GET /health` — liveness check.
+- `POST /forecast` — per-destination forecasting on historical demand data.
+- `POST /optimize` — multi-period transportation LP given a demand time series.
+- `POST /plan` — full pipeline: forecast → extract demand → optimize, in one call.
+
+Backed by `LogisticsAPI` (the only concrete `APIInterface`). Pydantic request/response
+models in `models.py`. All `ValueError` → HTTP 422; all other exceptions → HTTP 500.
+
+---
+
+### End-to-end data flow
+
 ```
-
----
-
-### 3. API Layer (`src/api/`)
-
-The API layer exposes the system through HTTP endpoints using FastAPI.
-
-It serves as a service interface that allows external users or systems to interact with the core logic. For example, it can expose endpoints for forecasting, optimization, or querying results.
-
-Unlike scripts, the API runs as a persistent service.
-
----
+Parquet files (data/ or experiments/datasets/)
+  → Reader → InputData
+  → DataProcessor → clean InputData
+  → PerDestinationForecastingPipeline.run() → AggregatedForecastingResult
+  → .export_forecasts() → [destination_id, date, demand] DataFrame
+  → MultiPeriodOptimizer.solve() → MultiPeriodResult (flows, inventory, total_cost)
+```
