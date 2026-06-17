@@ -161,7 +161,13 @@ Output: MultiPeriodResult (time-indexed flows + inventory levels + total_cost)
 - Stochastic demand generation
 - Scenario analysis under uncertainty
 
-### 5. Serving Layer
+### 5. Experiment Infrastructure
+- Named experiment configs in `experiments/configs/` (YAML-driven, validated against `PerDestinationConfig`)
+- Versioned dataset committed to git (`experiments/datasets/synthetic_v1/`)
+- `run_experiment.py` — runs one experiment end-to-end and saves 5 artifacts (`metrics.json`, `forecasts.parquet`, `flows.parquet`, `inventory.parquet`, `config.yaml`)
+- `run_all.py` — batch runner across all experiment configs with a summary table
+
+### 6. Serving Layer
 - FastAPI application with `/forecast`, `/optimize`, and `/plan` endpoints
 - `APIInterface` ABC decouples the HTTP layer from the forecasting and optimization engines
 - `LogisticsAPI` concrete implementation wiring `PerDestinationForecastingPipeline` and `MultiPeriodOptimizer`
