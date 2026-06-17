@@ -5,7 +5,7 @@ from datetime import date
 
 import polars as pl
 
-from forecasting.pipeline.per_destination_pipeline import AggregatedPipelineResult
+from forecasting.pipeline.per_destination_forecasting_pipeline import AggregatedForecastingResult
 from optimization import MultiPeriodResult
 
 
@@ -17,7 +17,7 @@ class APIInterface(ABC):
     """
 
     @abstractmethod
-    def forecast(self, input_data: pl.DataFrame) -> AggregatedPipelineResult:
+    def forecast(self, input_data: pl.DataFrame) -> AggregatedForecastingResult:
         """Run per-destination forecasting on historical demand data.
 
         Parameters
@@ -27,7 +27,7 @@ class APIInterface(ABC):
 
         Returns
         -------
-        AggregatedPipelineResult
+        AggregatedForecastingResult
             Per-destination outcomes: selected model, metrics, and forecast values.
         """
         ...

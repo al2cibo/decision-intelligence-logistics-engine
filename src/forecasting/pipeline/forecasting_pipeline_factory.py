@@ -1,20 +1,20 @@
-"""Factory function for creating a PerDestinationPipeline from configuration.
+"""Factory function for creating a PerDestinationForecastingPipeline from configuration.
 
-Provides `create_per_destination_pipeline_from_config` which:
+Provides `create_forecasting_pipeline` which:
 1. Creates the default model registry
 2. Validates all configured model names exist in the registry
-3. Constructs and returns a fully-configured PerDestinationPipeline
+3. Constructs and returns a fully-configured PerDestinationForecastingPipeline
 """
 
 from forecasting.registry.default_registry import create_default_registry
-from forecasting.pipeline.per_destination_pipeline import PerDestinationPipeline
+from forecasting.pipeline.per_destination_forecasting_pipeline import PerDestinationForecastingPipeline
 from utils.config import PerDestinationConfig
 
 
-def create_per_destination_pipeline_from_config(
+def create_forecasting_pipeline(
     config: PerDestinationConfig,
-) -> PerDestinationPipeline:
-    """Create a PerDestinationPipeline from a validated configuration.
+) -> PerDestinationForecastingPipeline:
+    """Create a PerDestinationForecastingPipeline from a validated configuration.
 
     Parameters
     ----------
@@ -24,7 +24,7 @@ def create_per_destination_pipeline_from_config(
 
     Returns
     -------
-    PerDestinationPipeline
+    PerDestinationForecastingPipeline
         A fully-configured pipeline ready to call `.run(df)`.
 
     Raises
@@ -45,7 +45,7 @@ def create_per_destination_pipeline_from_config(
             f"Available models: {available_models}"
         )
 
-    return PerDestinationPipeline(
+    return PerDestinationForecastingPipeline(
         registry=registry,
         model_names=config.model_names,
         train_ratio=config.train_ratio,

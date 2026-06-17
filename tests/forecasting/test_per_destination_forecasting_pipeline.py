@@ -1,4 +1,4 @@
-"""Unit tests for PerDestinationPipeline."""
+"""Unit tests for PerDestinationForecastingPipeline."""
 
 import math
 from datetime import date, timedelta
@@ -9,10 +9,10 @@ import pytest
 from forecasting.results.forecast_result import ForecastResult, TimePeriod
 from forecasting.registry.model_registry import ModelRegistry
 from forecasting.evaluation.per_destination_model_selector import SelectionResult
-from forecasting.pipeline.per_destination_pipeline import (
-    AggregatedPipelineResult,
+from forecasting.pipeline.per_destination_forecasting_pipeline import (
+    AggregatedForecastingResult,
     DestinationOutcome,
-    PerDestinationPipeline,
+    PerDestinationForecastingPipeline,
 )
 
 
@@ -59,7 +59,7 @@ def _make_multi_destination_df(
     return pl.concat(frames)
 
 
-# --- DestinationOutcome and AggregatedPipelineResult tests ---
+# --- DestinationOutcome and AggregatedForecastingResult tests ---
 
 
 class TestDestinationOutcome:
@@ -90,14 +90,14 @@ class TestDestinationOutcome:
             outcome.success = False  # type: ignore
 
 
-class TestAggregatedPipelineResult:
+class TestAggregatedForecastingResult:
     def test_successful_and_failed_properties(self):
         outcomes = [
             DestinationOutcome(destination_id="a", success=True),
             DestinationOutcome(destination_id="b", success=False, error="err"),
             DestinationOutcome(destination_id="c", success=True),
         ]
-        result = AggregatedPipelineResult(outcomes=outcomes)
+        result = AggregatedForecastingResult(outcomes=outcomes)
         assert len(result.successful) == 2
         assert len(result.failed) == 1
         assert result.failed[0].destination_id == "b"
@@ -109,7 +109,7 @@ class TestAggregatedPipelineResult:
 class TestPipelineInit:
     def test_valid_init(self):
         registry = _make_registry_with_naive_and_seasonal()
-        pipeline = PerDestinationPipeline(
+        pipeline = PerDestinationForecastingPipeline(
             registry=registry,
             model_names=["naive_forecaster"],
             train_ratio=0.8,
@@ -121,7 +121,7 @@ class TestPipelineInit:
     def test_max_workers_too_low(self):
         registry = _make_registry_with_naive_and_seasonal()
         with pytest.raises(ValueError, match="max_workers must be 1-128"):
-            PerDestinationPipeline(
+            PerDestinationForecastingPipeline(
                 registry=registry,
                 model_names=["naive_forecaster"],
                 max_workers=0,
@@ -130,7 +130,7 @@ class TestPipelineInit:
     def test_max_workers_too_high(self):
         registry = _make_registry_with_naive_and_seasonal()
         with pytest.raises(ValueError, match="max_workers must be 1-128"):
-            PerDestinationPipeline(
+            PerDestinationForecastingPipeline(
                 registry=registry,
                 model_names=["naive_forecaster"],
                 max_workers=129,
@@ -139,7 +139,7 @@ class TestPipelineInit:
     def test_train_ratio_zero(self):
         registry = _make_registry_with_naive_and_seasonal()
         with pytest.raises(ValueError, match="train_ratio must be in"):
-            PerDestinationPipeline(
+            PerDestinationForecastingPipeline(
                 registry=registry,
                 model_names=["naive_forecaster"],
                 train_ratio=0.0,
@@ -148,7 +148,7 @@ class TestPipelineInit:
     def test_train_ratio_one(self):
         registry = _make_registry_with_naive_and_seasonal()
         with pytest.raises(ValueError, match="train_ratio must be in"):
-            PerDestinationPipeline(
+            PerDestinationForecastingPipeline(
                 registry=registry,
                 model_names=["naive_forecaster"],
                 train_ratio=1.0,
@@ -157,7 +157,7 @@ class TestPipelineInit:
     def test_train_ratio_negative(self):
         registry = _make_registry_with_naive_and_seasonal()
         with pytest.raises(ValueError, match="train_ratio must be in"):
-            PerDestinationPipeline(
+            PerDestinationForecastingPipeline(
                 registry=registry,
                 model_names=["naive_forecaster"],
                 train_ratio=-0.1,
@@ -170,7 +170,7 @@ class TestPipelineInit:
 class TestSplitTrainTest:
     def test_basic_split(self):
         registry = _make_registry_with_naive_and_seasonal()
-        pipeline = PerDestinationPipeline(
+        pipeline = PerDestinationForecastingPipeline(
             registry=registry,
             model_names=["naive_forecaster"],
             train_ratio=0.8,
@@ -182,7 +182,7 @@ class TestSplitTrainTest:
 
     def test_split_preserves_chronological_order(self):
         registry = _make_registry_with_naive_and_seasonal()
-        pipeline = PerDestinationPipeline(
+        pipeline = PerDestinationForecastingPipeline(
             registry=registry,
             model_names=["naive_forecaster"],
             train_ratio=0.7,
@@ -194,7 +194,7 @@ class TestSplitTrainTest:
 
     def test_split_with_small_df(self):
         registry = _make_registry_with_naive_and_seasonal()
-        pipeline = PerDestinationPipeline(
+        pipeline = PerDestinationForecastingPipeline(
             registry=registry,
             model_names=["naive_forecaster"],
             train_ratio=0.5,
@@ -212,7 +212,7 @@ class TestPipelineRun:
     def test_basic_two_destination_run(self):
         """Test pipeline processes 2 destinations and produces results for each."""
         registry = _make_registry_with_naive_and_seasonal()
-        pipeline = PerDestinationPipeline(
+        pipeline = PerDestinationForecastingPipeline(
             registry=registry,
             model_names=["naive_forecaster", "seasonal_forecaster"],
             train_ratio=0.7,
@@ -239,7 +239,7 @@ class TestPipelineRun:
     def test_insufficient_history_skipping(self):
         """Destinations with fewer rows than minimum_history_length are skipped."""
         registry = _make_registry_with_naive_and_seasonal()
-        pipeline = PerDestinationPipeline(
+        pipeline = PerDestinationForecastingPipeline(
             registry=registry,
             model_names=["naive_forecaster"],
             train_ratio=0.8,
@@ -285,7 +285,7 @@ class TestPipelineRun:
         )
         registry.register("failing_model", lambda **kw: FailingForecaster(**kw))
 
-        pipeline = PerDestinationPipeline(
+        pipeline = PerDestinationForecastingPipeline(
             registry=registry,
             model_names=["failing_model", "naive_forecaster"],
             train_ratio=0.8,
@@ -324,7 +324,7 @@ class TestPipelineRun:
         registry = ModelRegistry()
         registry.register("failing_model", lambda **kw: FailingForecaster(**kw))
 
-        pipeline = PerDestinationPipeline(
+        pipeline = PerDestinationForecastingPipeline(
             registry=registry,
             model_names=["failing_model"],
             train_ratio=0.8,
@@ -351,8 +351,8 @@ class TestPipelineRun:
             random_seed=42,
         )
 
-        pipeline_seq = PerDestinationPipeline(max_workers=1, **common_kwargs)
-        pipeline_par = PerDestinationPipeline(max_workers=2, **common_kwargs)
+        pipeline_seq = PerDestinationForecastingPipeline(max_workers=1, **common_kwargs)
+        pipeline_par = PerDestinationForecastingPipeline(max_workers=2, **common_kwargs)
 
         result_seq = pipeline_seq.run(df)
         result_par = pipeline_par.run(df)
@@ -382,7 +382,7 @@ class TestPipelineRun:
         registry = _make_registry_with_naive_and_seasonal()
         df = _make_multi_destination_df(["dest_A", "dest_B"], n_rows_per_dest=30)
 
-        pipeline = PerDestinationPipeline(
+        pipeline = PerDestinationForecastingPipeline(
             registry=registry,
             model_names=["naive_forecaster"],
             train_ratio=0.8,
@@ -414,7 +414,7 @@ class TestPipelineRun:
     def test_model_params_passed_through(self):
         """Model parameters from model_params dict are passed to model creation."""
         registry = _make_registry_with_naive_and_seasonal()
-        pipeline = PerDestinationPipeline(
+        pipeline = PerDestinationForecastingPipeline(
             registry=registry,
             model_names=["seasonal_forecaster"],
             train_ratio=0.8,
@@ -433,7 +433,7 @@ class TestPipelineRun:
     def test_forecast_result_fields(self):
         """ForecastResult objects have correct field values."""
         registry = _make_registry_with_naive_and_seasonal()
-        pipeline = PerDestinationPipeline(
+        pipeline = PerDestinationForecastingPipeline(
             registry=registry,
             model_names=["naive_forecaster"],
             train_ratio=0.8,

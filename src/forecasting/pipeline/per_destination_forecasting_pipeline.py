@@ -37,7 +37,7 @@ class DestinationOutcome:
 
 
 @dataclass(frozen=True)
-class AggregatedPipelineResult:
+class AggregatedForecastingResult:
     """Collection of per-destination outcomes from a full pipeline run."""
 
     outcomes: list[DestinationOutcome]
@@ -52,7 +52,7 @@ class AggregatedPipelineResult:
         """Outcomes where processing failed (all models errored or insufficient data)."""
         return [o for o in self.outcomes if not o.success]
 
-    def to_demand_dataframe(self) -> pl.DataFrame:
+    def export_forecasts(self) -> pl.DataFrame:
         """Return selected forecast values as a ``[destination_id, date, demand]`` DataFrame.
 
         Covers the validation window of the winning model for each successful destination.
@@ -85,7 +85,7 @@ class AggregatedPipelineResult:
         return pl.concat(frames).sort(["destination_id", "date"])
 
 
-class PerDestinationPipeline:
+class PerDestinationForecastingPipeline:
     """Trains, evaluates, and selects a forecasting model independently per destination.
 
     Parameters
@@ -139,7 +139,7 @@ class PerDestinationPipeline:
         self.model_params = model_params or {}
         self._selector = PerDestinationModelSelector(metric=selection_metric)
 
-    def run(self, df: pl.DataFrame, **kwargs: Any) -> AggregatedPipelineResult:
+    def run(self, df: pl.DataFrame, **kwargs: Any) -> AggregatedForecastingResult:
         """Execute the pipeline across all destinations in the input DataFrame.
 
         Parameters
@@ -149,7 +149,7 @@ class PerDestinationPipeline:
 
         Returns
         -------
-        AggregatedPipelineResult
+        AggregatedForecastingResult
             One :class:`DestinationOutcome` per destination that had enough history.
         """
         df_sorted = df.sort(["destination_id", "date"])
@@ -186,7 +186,7 @@ class PerDestinationPipeline:
                 for dest_id, dest_df in work_items
             )
 
-        return AggregatedPipelineResult(outcomes=outcomes)
+        return AggregatedForecastingResult(outcomes=outcomes)
 
     def _process_destination(
         self, destination_id: str, dest_df: pl.DataFrame

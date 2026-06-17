@@ -1,17 +1,17 @@
 """Forecasting pipelines: orchestration of model training, evaluation, and selection."""
 
-from .pipeline_protocol import PipelineProtocol
-from .per_destination_pipeline import (
-    PerDestinationPipeline,
-    AggregatedPipelineResult,
+from .forecasting_pipeline_protocol import ForecastingPipelineProtocol
+from .per_destination_forecasting_pipeline import (
+    PerDestinationForecastingPipeline,
+    AggregatedForecastingResult,
     DestinationOutcome,
 )
-from .pipeline_factory import create_per_destination_pipeline_from_config
+from .forecasting_pipeline_factory import create_forecasting_pipeline
 
 __all__ = [
-    "PipelineProtocol",
-    "PerDestinationPipeline",
-    "AggregatedPipelineResult",
+    "ForecastingPipelineProtocol",
+    "PerDestinationForecastingPipeline",
+    "AggregatedForecastingResult",
     "DestinationOutcome",
-    "create_per_destination_pipeline_from_config",
+    "create_forecasting_pipeline",
 ]

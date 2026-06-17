@@ -74,7 +74,7 @@ def _to_destinations_df(records) -> pl.DataFrame:
 
 
 def _build_forecast_response(result) -> ForecastResponse:
-    """Convert AggregatedPipelineResult → ForecastResponse."""
+    """Convert AggregatedForecastingResult → ForecastResponse."""
     successful = []
     for outcome in result.successful:
         selected_name = outcome.selected.model_name

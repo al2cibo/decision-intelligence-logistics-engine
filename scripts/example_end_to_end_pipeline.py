@@ -3,7 +3,7 @@ End-to-end pipeline: per-destination forecasting → multi-period optimization.
 
 Workflow:
   1. Ingest and process raw data
-  2. Run PerDestinationPipeline — independently train, evaluate, and select
+  2. Run PerDestinationForecastingPipeline — independently train, evaluate, and select
      the best forecasting model per destination
   3. Extract the selected model's test-period forecasts as a demand time series
   4. Feed that demand time series into the MultiPeriodOptimizer
@@ -20,7 +20,7 @@ import polars as pl
 from data.ingestion import Reader
 from data.processing.data_processor import DataProcessor
 
-from forecasting import create_per_destination_pipeline_from_config, AggregatedPipelineResult
+from forecasting import create_forecasting_pipeline, AggregatedForecastingResult
 
 from optimization import MultiPeriodOptimizer, MultiPeriodResult
 
@@ -54,9 +54,9 @@ def parse_args():
 def run_per_destination_forecasting(
     demand_df: pl.DataFrame,
     config: PerDestinationConfig,
-) -> AggregatedPipelineResult:
+) -> AggregatedForecastingResult:
     """Train, evaluate, and select the best model independently per destination."""
-    pipeline = create_per_destination_pipeline_from_config(config)
+    pipeline = create_forecasting_pipeline(config)
 
     logger.info("Running per-destination pipeline on %d rows...", demand_df.height)
     result = pipeline.run(demand_df)
@@ -180,7 +180,7 @@ def main():
     )
 
     # --- Extract test-period forecasts as demand time series ---
-    demand_ts = forecast_result.to_demand_dataframe()
+    demand_ts = forecast_result.export_forecasts()
     logger.info(
         "Extracted demand time series: %d rows across %d destinations",
         demand_ts.height,

@@ -6,19 +6,19 @@ import polars as pl
 
 
 @runtime_checkable
-class PipelineProtocol(Protocol):
+class ForecastingPipelineProtocol(Protocol):
     """Protocol satisfied by any object with a ``run(df, **kwargs)`` method.
 
     Conformance is checked via structural subtyping (duck typing): no base
-    class inheritance is required. :class:`PerDestinationPipeline` conforms
-    to this protocol.
+    class inheritance is required. :class:`PerDestinationForecastingPipeline`
+    conforms to this protocol.
 
     Examples
     --------
     >>> class MyPipeline:
     ...     def run(self, df: pl.DataFrame, **kwargs: Any) -> Any:
     ...         return df
-    >>> isinstance(MyPipeline(), PipelineProtocol)
+    >>> isinstance(MyPipeline(), ForecastingPipelineProtocol)
     True
     """
 

@@ -5,13 +5,13 @@ from datetime import date
 import polars as pl
 
 from api.api_interface import APIInterface
-from forecasting import AggregatedPipelineResult, create_per_destination_pipeline_from_config
+from forecasting import AggregatedForecastingResult, create_forecasting_pipeline
 from optimization import MultiPeriodOptimizer, MultiPeriodResult
 from utils.config import PerDestinationConfig
 
 
 class LogisticsAPI(APIInterface):
-    """Concrete API implementation wiring PerDestinationPipeline and MultiPeriodOptimizer.
+    """Concrete API implementation wiring PerDestinationForecastingPipeline and MultiPeriodOptimizer.
 
     Parameters
     ----------
@@ -29,9 +29,9 @@ class LogisticsAPI(APIInterface):
         self._config = config
         self._solver_name = solver_name
 
-    def forecast(self, input_data: pl.DataFrame) -> AggregatedPipelineResult:
+    def forecast(self, input_data: pl.DataFrame) -> AggregatedForecastingResult:
         """Run per-destination forecasting on historical demand data."""
-        pipeline = create_per_destination_pipeline_from_config(self._config)
+        pipeline = create_forecasting_pipeline(self._config)
         return pipeline.run(input_data)
 
     def optimize(

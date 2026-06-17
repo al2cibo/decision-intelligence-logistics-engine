@@ -1,19 +1,19 @@
-"""Tests for the pipeline factory function."""
+"""Tests for the forecasting pipeline factory function."""
 
 import pytest
 import polars as pl
 from datetime import date, timedelta
 
-from forecasting.pipeline.pipeline_factory import create_per_destination_pipeline_from_config
-from forecasting.pipeline.per_destination_pipeline import PerDestinationPipeline
+from forecasting.pipeline.forecasting_pipeline_factory import create_forecasting_pipeline
+from forecasting.pipeline.per_destination_forecasting_pipeline import PerDestinationForecastingPipeline
 from utils.config import PerDestinationConfig
 
 
-class TestCreatePerDestinationPipelineFromConfig:
-    """Tests for create_per_destination_pipeline_from_config."""
+class TestCreateForecastingPipeline:
+    """Tests for create_forecasting_pipeline."""
 
     def test_creates_pipeline_with_valid_config(self):
-        """Factory returns a PerDestinationPipeline with valid config."""
+        """Factory returns a PerDestinationForecastingPipeline with valid config."""
         config = PerDestinationConfig(
             model_names=["naive_forecaster", "seasonal_forecaster"],
             train_ratio=0.8,
@@ -24,9 +24,9 @@ class TestCreatePerDestinationPipelineFromConfig:
             model_params={"seasonal_forecaster": {"lag_value": 7}},
         )
 
-        pipeline = create_per_destination_pipeline_from_config(config)
+        pipeline = create_forecasting_pipeline(config)
 
-        assert isinstance(pipeline, PerDestinationPipeline)
+        assert isinstance(pipeline, PerDestinationForecastingPipeline)
         assert pipeline.model_names == ["naive_forecaster", "seasonal_forecaster"]
         assert pipeline.train_ratio == 0.8
         assert pipeline.selection_metric == "wape"
@@ -44,7 +44,7 @@ class TestCreatePerDestinationPipelineFromConfig:
         )
 
         with pytest.raises(ValueError, match="not registered"):
-            create_per_destination_pipeline_from_config(config)
+            create_forecasting_pipeline(config)
 
     def test_all_default_models_accepted(self):
         """Factory accepts all 5 default registered models."""
@@ -61,9 +61,9 @@ class TestCreatePerDestinationPipelineFromConfig:
             max_workers=2,
         )
 
-        pipeline = create_per_destination_pipeline_from_config(config)
+        pipeline = create_forecasting_pipeline(config)
 
-        assert isinstance(pipeline, PerDestinationPipeline)
+        assert isinstance(pipeline, PerDestinationForecastingPipeline)
         assert len(pipeline.model_names) == 5
 
     def test_model_params_passed_through(self):
@@ -78,7 +78,7 @@ class TestCreatePerDestinationPipelineFromConfig:
             },
         )
 
-        pipeline = create_per_destination_pipeline_from_config(config)
+        pipeline = create_forecasting_pipeline(config)
 
         assert pipeline.model_params == {
             "rolling_window_forecaster": {"rolling_window": 14},
@@ -97,7 +97,7 @@ class TestCreatePerDestinationPipelineFromConfig:
             model_params={"seasonal_forecaster": {"lag_value": 7}},
         )
 
-        pipeline = create_per_destination_pipeline_from_config(config)
+        pipeline = create_forecasting_pipeline(config)
 
         # Create simple test data with 2 destinations
         dates = [date(2024, 1, 1) + timedelta(days=i) for i in range(30)]
