@@ -2,7 +2,7 @@
 
 from .input_data import InputData
 from .ingestion import Reader
-from .generation import generate_synthetic_logistics_data
+from .synthetic_data_generation import generate_synthetic_logistics_data
 
 __all__ = [
     "InputData",

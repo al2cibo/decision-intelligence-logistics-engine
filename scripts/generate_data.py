@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from data.generation import (
+from data.synthetic_data_generation import (
     generate_synthetic_logistics_data,
 )
 from datetime import datetime
