@@ -1,0 +1,11 @@
+experiment_name: baseline_global_ets
+dataset_path: experiments/datasets/synthetic_v1
+output_path: experiments/results/baseline_global_ets
+
+per_destination_forecasting:
+  model_names:
+    - ets_forecaster
+  train_ratio: 0.8
+  selection_metric: wape
+  minimum_history_length: 10
+  random_seed: 42

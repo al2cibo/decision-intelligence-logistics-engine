@@ -31,3 +31,9 @@ Thumbs.db
 # Parquet/large files
 *.parquet
 *.feather
+
+# Experiments — results and figures are generated, not committed
+experiments/results/
+experiments/figures/
+# Dataset is fixed and committed; negate the global *.parquet rule for it
+!experiments/datasets/**/*.parquet
