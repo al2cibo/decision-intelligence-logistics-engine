@@ -25,7 +25,6 @@ from forecasting import create_forecasting_pipeline, AggregatedForecastingResult
 from optimization import MultiPeriodOptimizer, MultiPeriodResult
 
 from utils.config import load_config
-from forecasting.config import PerDestinationConfig
 from utils.system_paths import get_project_root
 
 # ---------------------------------------------------------------------
@@ -157,25 +156,11 @@ def main():
         raise ValueError("Empty demand history after processing")
 
     # --- Per-destination forecasting config ---
-    # ETS and SARIMAX are available but slower; uncomment to include them.
-    per_dest_config = PerDestinationConfig(
-        model_names=[
-            "naive_forecaster",
-            "seasonal_forecaster",
-            "rolling_window_forecaster",
-            # "ets_forecaster",
-            # "sarimax_forecaster",
-        ],
-        train_ratio=config.forecasting.train_ratio if config.forecasting else 0.8,
-        selection_metric=config.forecasting.metric if config.forecasting else "wape",
-        max_workers=1,
-        minimum_history_length=10,
-        random_seed=42,
-        model_params={
-            "seasonal_forecaster": {"lag_value": 7},
-            "rolling_window_forecaster": {"rolling_window": 7},
-        },
-    )
+    if config.per_destination_forecasting is None:
+        raise ValueError(
+            "per_destination_forecasting section is missing from the config file."
+        )
+    per_dest_config = config.per_destination_forecasting
 
     # --- Per-destination forecasting ---
     forecast_result = run_per_destination_forecasting(

@@ -26,24 +26,9 @@ class TestLoadConfigValid:
         config = load_config(tmp_path, config_path)
 
         assert isinstance(config, Config)
-        assert config.forecasting is None
+        assert config.per_destination_forecasting is None
 
-    def test_with_forecasting_section(self, tmp_path):
-        (tmp_path / "data" / "synthetic2").mkdir(parents=True)
-        config_path = _write_yaml(
-            tmp_path,
-            {
-                "data": {"input_path": "data/synthetic2"},
-                "forecasting": {"metric": "mae", "train_ratio": 0.7},
-            },
-        )
-        config = load_config(tmp_path, config_path)
-
-        assert config.forecasting is not None
-        assert config.forecasting.metric == "mae"
-        assert config.forecasting.train_ratio == 0.7
-
-    def test_unknown_sections_are_ignored(self, tmp_path):
+    def test_with_per_destination_section(self, tmp_path):
         (tmp_path / "data" / "synthetic2").mkdir(parents=True)
         config_path = _write_yaml(
             tmp_path,
@@ -53,7 +38,9 @@ class TestLoadConfigValid:
             },
         )
         config = load_config(tmp_path, config_path)
-        assert isinstance(config, Config)
+
+        assert config.per_destination_forecasting is not None
+        assert config.per_destination_forecasting.model_names == ["naive_forecaster"]
 
 
 class TestLoadConfigFileErrors:
@@ -71,16 +58,4 @@ class TestLoadConfigFileErrors:
         config_path = tmp_path / "list.yaml"
         config_path.write_text("- item1\n- item2\n")
         with pytest.raises(ValueError, match="must contain a YAML mapping"):
-            load_config(tmp_path, config_path)
-
-    def test_invalid_metric(self, tmp_path):
-        (tmp_path / "data" / "synthetic2").mkdir(parents=True)
-        config_path = _write_yaml(
-            tmp_path,
-            {
-                "data": {"input_path": "data/synthetic2"},
-                "forecasting": {"metric": "r2"},
-            },
-        )
-        with pytest.raises(ValueError, match="Unrecognised metric"):
             load_config(tmp_path, config_path)

@@ -102,8 +102,7 @@ def _save_metrics(
     per_destination = {}
     for outcome in forecast_result.successful:
         selected_fr = next(
-            fr for fr in outcome.results
-            if fr.model_name == outcome.selected.model_name
+            fr for fr in outcome.results if fr.model_name == outcome.selected.model_name
         )
         per_destination[outcome.destination_id] = {
             "selected_model": outcome.selected.model_name,

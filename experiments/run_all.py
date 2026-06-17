@@ -61,14 +61,16 @@ def _print_summary() -> None:
 
         agg = m.get("aggregated_forecast", {})
         costs = m.get("costs", {})
-        rows.append((
-            experiment_name,
-            "OK",
-            f"{agg.get('mean_wape', float('nan')):.4f}",
-            f"{costs.get('total_cost', float('nan')):.2f}",
-            f"{costs.get('transportation_cost', float('nan')):.2f}",
-            f"{costs.get('holding_cost', float('nan')):.2f}",
-        ))
+        rows.append(
+            (
+                experiment_name,
+                "OK",
+                f"{agg.get('mean_wape', float('nan')):.4f}",
+                f"{costs.get('total_cost', float('nan')):.2f}",
+                f"{costs.get('transportation_cost', float('nan')):.2f}",
+                f"{costs.get('holding_cost', float('nan')):.2f}",
+            )
+        )
 
     header = f"{'Experiment':<30} {'Status':<8} {'WAPE':>8} {'Total':>12} {'Transport':>12} {'Holding':>10}"
     separator = "-" * len(header)
@@ -76,7 +78,9 @@ def _print_summary() -> None:
     print(header)
     print(separator)
     for row in rows:
-        print(f"{row[0]:<30} {row[1]:<8} {row[2]:>8} {row[3]:>12} {row[4]:>12} {row[5]:>10}")
+        print(
+            f"{row[0]:<30} {row[1]:<8} {row[2]:>8} {row[3]:>12} {row[4]:>12} {row[5]:>10}"
+        )
     print(separator + "\n")
 
 

@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from pathlib import Path
 import yaml
 
-_KNOWN_METRICS = {"mae", "mse", "rmse", "mape", "wape"}
+from forecasting.config import PerDestinationConfig, _validate_per_destination_config
 
 
 @dataclass
@@ -13,15 +13,9 @@ class DataConfig:
 
 
 @dataclass
-class ForecastingConfig:
-    metric: str = "wape"
-    train_ratio: float = 0.8
-
-
-@dataclass
 class Config:
     data: DataConfig
-    forecasting: ForecastingConfig | None = None
+    per_destination_forecasting: PerDestinationConfig | None = None
 
 
 def load_config(project_root: Path, config_path: Path) -> Config:
@@ -41,19 +35,12 @@ def load_config(project_root: Path, config_path: Path) -> Config:
             f"Configuration file must contain a YAML mapping, got {type(raw).__name__}."
         )
 
-    forecasting_config: ForecastingConfig | None = None
-    forecasting_raw = raw.get("forecasting")
-
-    if forecasting_raw is not None:
-        metric = forecasting_raw.get("metric", "wape")
-        if metric not in _KNOWN_METRICS:
-            raise ValueError(
-                f"Unrecognised metric '{metric}'. Must be one of {sorted(_KNOWN_METRICS)}."
-            )
-        train_ratio = forecasting_raw.get("train_ratio", 0.8)
-        forecasting_config = ForecastingConfig(metric=metric, train_ratio=train_ratio)
+    per_destination_config: PerDestinationConfig | None = None
+    per_destination_raw = raw.get("per_destination_forecasting")
+    if per_destination_raw is not None:
+        per_destination_config = _validate_per_destination_config(per_destination_raw)
 
     return Config(
         data=DataConfig(project_root / raw["data"]["input_path"]),
-        forecasting=forecasting_config,
+        per_destination_forecasting=per_destination_config,
     )

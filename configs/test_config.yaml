@@ -1,6 +1,20 @@
 data:
   input_path: data/synthetic2
 
-forecasting:
-  metric: wape
+per_destination_forecasting:
+  model_names:
+    - naive_forecaster
+    - seasonal_forecaster
+    - rolling_window_forecaster
+    # - ets_forecaster      # available but slower
+    # - sarimax_forecaster  # available but slower
   train_ratio: 0.8
+  selection_metric: wape
+  max_workers: 1
+  minimum_history_length: 10
+  random_seed: 42
+  model_params:
+    seasonal_forecaster:
+      lag_value: 7
+    rolling_window_forecaster:
+      rolling_window: 7
