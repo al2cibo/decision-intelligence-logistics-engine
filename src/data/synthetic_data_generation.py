@@ -63,7 +63,9 @@ def generate_synthetic_logistics_data(
                 "destination_id": destination_id,
                 "unit_cost": float(rng.integers(5, 25)),
             }
-            for origin_id, destination_id in itertools.product(origin_ids, destination_ids)
+            for origin_id, destination_id in itertools.product(
+                origin_ids, destination_ids
+            )
         ]
     )
 
@@ -84,7 +86,9 @@ def generate_synthetic_logistics_data(
             promo_factor = 1.25 if rng.random() < 0.08 else 1.0
             noise = rng.normal(0, 4)
 
-            demand = max(0.0, base * weekly_factor * trend_factor * promo_factor + noise)
+            demand = max(
+                0.0, base * weekly_factor * trend_factor * promo_factor + noise
+            )
             demand_rows.append(
                 {
                     "date": date,

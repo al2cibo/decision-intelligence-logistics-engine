@@ -6,10 +6,20 @@ from datetime import date
 import polars as pl
 from ortools.linear_solver import pywraplp
 
-from .model_builder import build_lookups, create_variables, add_constraints, set_objective
+from .model_builder import (
+    build_lookups,
+    create_variables,
+    add_constraints,
+    set_objective,
+)
 from .preprocessing import preprocess_demand
 from .result import MultiPeriodResult
-from .solution_extractor import extract_flows, extract_holding_cost, extract_inventory, extract_transportation_cost
+from .solution_extractor import (
+    extract_flows,
+    extract_holding_cost,
+    extract_inventory,
+    extract_transportation_cost,
+)
 from .validation import MAX_VARIABLES, check_feasibility, validate_inputs
 
 logger = logging.getLogger(__name__)
@@ -82,7 +92,12 @@ class MultiPeriodOptimizer:
             On invalid inputs, infeasible problems, or solver failures.
         """
         validate_inputs(
-            demand_ts, origins_df, lanes_df, destinations_df, planning_horizon, initial_inventory
+            demand_ts,
+            origins_df,
+            lanes_df,
+            destinations_df,
+            planning_horizon,
+            initial_inventory,
         )
         check_feasibility(demand_ts, origins_df, lanes_df, planning_horizon)
 
@@ -90,24 +105,32 @@ class MultiPeriodOptimizer:
 
         solver = pywraplp.Solver.CreateSolver(self._solver_name)
         if solver is None:
-            raise ValueError(f"Could not create solver with backend '{self._solver_name}'")
+            raise ValueError(
+                f"Could not create solver with backend '{self._solver_name}'"
+            )
 
         if initial_inventory is None:
             initial_inventory = {}
 
         lookups = build_lookups(demand_ts, origins_df, lanes_df, destinations_df)
         flow_vars, inv_vars = create_variables(solver, lookups, planning_horizon)
-        add_constraints(solver, lookups, flow_vars, inv_vars, planning_horizon, initial_inventory)
+        add_constraints(
+            solver, lookups, flow_vars, inv_vars, planning_horizon, initial_inventory
+        )
         set_objective(solver, lookups, flow_vars, inv_vars, planning_horizon)
 
         status = solver.Solve()
         if status != pywraplp.Solver.OPTIMAL:
             status_str = _STATUS_NAMES.get(status, f"UNKNOWN({status})")
-            raise ValueError(f"Solver did not find an optimal solution. Status: {status_str}")
+            raise ValueError(
+                f"Solver did not find an optimal solution. Status: {status_str}"
+            )
 
         total_cost = solver.Objective().Value()
         flows_df = extract_flows(flow_vars)
-        inventory_df = extract_inventory(inv_vars, lookups.destinations, planning_horizon)
+        inventory_df = extract_inventory(
+            inv_vars, lookups.destinations, planning_horizon
+        )
         transportation_cost = extract_transportation_cost(flow_vars, lookups.lanes_list)
         holding_cost = extract_holding_cost(inv_vars, lookups.holding_cost_map)
 
@@ -120,6 +143,8 @@ class MultiPeriodOptimizer:
         )
 
     @staticmethod
-    def _preprocess_demand(demand_ts: pl.DataFrame, planning_horizon: list[date]) -> pl.DataFrame:
+    def _preprocess_demand(
+        demand_ts: pl.DataFrame, planning_horizon: list[date]
+    ) -> pl.DataFrame:
         """Backward-compatible alias for :func:`preprocessing.preprocess_demand`."""
         return preprocess_demand(demand_ts, planning_horizon)

@@ -43,8 +43,7 @@ class ModelRegistry:
         if name not in self._factories:
             available = list(self._factories.keys())
             raise KeyError(
-                f"Model '{name}' is not registered. "
-                f"Available models: {available}"
+                f"Model '{name}' is not registered. " f"Available models: {available}"
             )
         return self._factories[name](**kwargs)
 

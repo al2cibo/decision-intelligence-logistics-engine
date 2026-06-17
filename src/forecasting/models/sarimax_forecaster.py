@@ -56,7 +56,9 @@ class SARIMAXForecaster(BaseForecaster):
         model = SARIMAX(
             y,
             order=self.order,
-            seasonal_order=self.seasonal_order if self.seasonal_order is not None else (0, 0, 0, 0),
+            seasonal_order=(
+                self.seasonal_order if self.seasonal_order is not None else (0, 0, 0, 0)
+            ),
         )
         self._fitted_result = model.fit(disp=False)
 

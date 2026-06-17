@@ -34,7 +34,9 @@ def extract_transportation_cost(flow_vars: FlowVars, lanes_list: list[dict]) -> 
     )
 
 
-def extract_holding_cost(inv_vars: InventoryVars, holding_cost_map: dict[str, float]) -> float:
+def extract_holding_cost(
+    inv_vars: InventoryVars, holding_cost_map: dict[str, float]
+) -> float:
     """Sum holding_cost × inventory over all destination-period combinations."""
     return sum(
         holding_cost_map.get(d_id, 0.0) * var.solution_value()

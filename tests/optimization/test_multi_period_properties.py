@@ -9,7 +9,6 @@ from hypothesis import strategies as st
 
 from optimization import MultiPeriodOptimizer
 
-
 # ---------------------------------------------------------------------------
 # Hypothesis strategies
 # ---------------------------------------------------------------------------
@@ -47,7 +46,14 @@ def demand_with_duplicates(draw):
     rows = []
     for dest in destinations:
         for d in horizon:
-            demand_val = draw(st.floats(min_value=0.0, max_value=100.0, allow_nan=False, allow_infinity=False))
+            demand_val = draw(
+                st.floats(
+                    min_value=0.0,
+                    max_value=100.0,
+                    allow_nan=False,
+                    allow_infinity=False,
+                )
+            )
             rows.append({"destination_id": dest, "date": d, "demand": demand_val})
 
     # Add duplicate rows for some (destination_id, date) pairs
@@ -55,12 +61,18 @@ def demand_with_duplicates(draw):
     for _ in range(num_duplicates):
         # Pick a random existing row to duplicate (with a different demand value)
         idx = draw(st.integers(min_value=0, max_value=len(rows) - 1))
-        dup_demand = draw(st.floats(min_value=0.0, max_value=100.0, allow_nan=False, allow_infinity=False))
-        rows.append({
-            "destination_id": rows[idx]["destination_id"],
-            "date": rows[idx]["date"],
-            "demand": dup_demand,
-        })
+        dup_demand = draw(
+            st.floats(
+                min_value=0.0, max_value=100.0, allow_nan=False, allow_infinity=False
+            )
+        )
+        rows.append(
+            {
+                "destination_id": rows[idx]["destination_id"],
+                "date": rows[idx]["date"],
+                "demand": dup_demand,
+            }
+        )
 
     demand_df = pl.DataFrame(
         {
@@ -113,14 +125,13 @@ def test_demand_deduplication_idempotence(data):
     result_dupes_sorted = result_from_dupes.sort("destination_id", "date")
     result_agg_sorted = result_from_aggregated.sort("destination_id", "date")
 
-    assert result_dupes_sorted.shape == result_agg_sorted.shape, (
-        f"Shape mismatch: {result_dupes_sorted.shape} vs {result_agg_sorted.shape}"
-    )
+    assert (
+        result_dupes_sorted.shape == result_agg_sorted.shape
+    ), f"Shape mismatch: {result_dupes_sorted.shape} vs {result_agg_sorted.shape}"
     assert result_dupes_sorted.equals(result_agg_sorted), (
         f"Results differ:\nFrom duplicates:\n{result_dupes_sorted}\n"
         f"From pre-aggregated:\n{result_agg_sorted}"
     )
-
 
 
 # ---------------------------------------------------------------------------
@@ -207,7 +218,14 @@ def unreachable_destination_problem(draw):
         }
     )
 
-    return (demand_ts, origins_df, lanes_df, destinations_df, horizon, unreachable_dests)
+    return (
+        demand_ts,
+        origins_df,
+        lanes_df,
+        destinations_df,
+        horizon,
+        unreachable_dests,
+    )
 
 
 # Validates: Requirements 7.3
@@ -223,7 +241,9 @@ def test_unreachable_destination_detection(problem):
     **Validates: Requirements 7.3**
     """
     # Feature: multi-period-optimization, Property 8: Unreachable Destination Detection
-    demand_ts, origins_df, lanes_df, destinations_df, horizon, unreachable_dests = problem
+    demand_ts, origins_df, lanes_df, destinations_df, horizon, unreachable_dests = (
+        problem
+    )
 
     optimizer = MultiPeriodOptimizer()
 
@@ -244,9 +264,9 @@ def test_unreachable_destination_detection(problem):
         error_message = str(e)
 
         # Verify the error message mentions unreachable destinations
-        assert "Unreachable destinations" in error_message, (
-            f"Error message does not mention 'Unreachable destinations': {error_message}"
-        )
+        assert (
+            "Unreachable destinations" in error_message
+        ), f"Error message does not mention 'Unreachable destinations': {error_message}"
 
         # Verify every unreachable destination ID appears in the error message
         for dest_id in unreachable_dests:
@@ -289,8 +309,10 @@ def demand_with_extra_dates(draw):
     in_horizon_demands = draw(
         st.lists(
             st.floats(
-                min_value=0.0, max_value=1000.0,
-                allow_nan=False, allow_infinity=False,
+                min_value=0.0,
+                max_value=1000.0,
+                allow_nan=False,
+                allow_infinity=False,
             ),
             min_size=len(in_horizon_dates),
             max_size=len(in_horizon_dates),
@@ -318,8 +340,10 @@ def demand_with_extra_dates(draw):
     extra_demands = draw(
         st.lists(
             st.floats(
-                min_value=0.0, max_value=1000.0,
-                allow_nan=False, allow_infinity=False,
+                min_value=0.0,
+                max_value=1000.0,
+                allow_nan=False,
+                allow_infinity=False,
             ),
             min_size=len(extra_dates),
             max_size=len(extra_dates),
@@ -399,7 +423,6 @@ def test_extra_date_filtering(data):
     )
 
 
-
 # ---------------------------------------------------------------------------
 # Property 9: Capacity Feasibility Detection
 # Feature: multi-period-optimization, Property 9: Capacity Feasibility Detection
@@ -425,7 +448,9 @@ def capacity_infeasible_problem(draw):
     # Generate capacities (positive values)
     capacities = draw(
         st.lists(
-            st.floats(min_value=1.0, max_value=100.0, allow_nan=False, allow_infinity=False),
+            st.floats(
+                min_value=1.0, max_value=100.0, allow_nan=False, allow_infinity=False
+            ),
             min_size=n_origins,
             max_size=n_origins,
         )
@@ -436,7 +461,9 @@ def capacity_infeasible_problem(draw):
 
     # Generate demand that exceeds total capacity
     excess = draw(
-        st.floats(min_value=1.0, max_value=1000.0, allow_nan=False, allow_infinity=False)
+        st.floats(
+            min_value=1.0, max_value=1000.0, allow_nan=False, allow_infinity=False
+        )
     )
     total_demand_target = total_capacity + excess
 
@@ -468,10 +495,12 @@ def capacity_infeasible_problem(draw):
     )
 
     # Build origins_df
-    origins_df = pl.DataFrame({
-        "origin_id": origin_ids,
-        "daily_capacity": capacities,
-    })
+    origins_df = pl.DataFrame(
+        {
+            "origin_id": origin_ids,
+            "daily_capacity": capacities,
+        }
+    )
 
     # Build lanes_df: connect every origin to every destination for reachability
     lane_origin_ids = []
@@ -482,7 +511,14 @@ def capacity_infeasible_problem(draw):
             lane_origin_ids.append(o_id)
             lane_dest_ids.append(d_id)
             lane_costs.append(
-                draw(st.floats(min_value=0.1, max_value=50.0, allow_nan=False, allow_infinity=False))
+                draw(
+                    st.floats(
+                        min_value=0.1,
+                        max_value=50.0,
+                        allow_nan=False,
+                        allow_infinity=False,
+                    )
+                )
             )
 
     lanes_df = pl.DataFrame(
@@ -491,13 +527,19 @@ def capacity_infeasible_problem(draw):
             "destination_id": lane_dest_ids,
             "unit_cost": lane_costs,
         },
-        schema={"origin_id": pl.Utf8, "destination_id": pl.Utf8, "unit_cost": pl.Float64},
+        schema={
+            "origin_id": pl.Utf8,
+            "destination_id": pl.Utf8,
+            "unit_cost": pl.Float64,
+        },
     )
 
     # Build destinations_df
-    destinations_df = pl.DataFrame({
-        "destination_id": destination_ids,
-    })
+    destinations_df = pl.DataFrame(
+        {
+            "destination_id": destination_ids,
+        }
+    )
 
     return demand_ts, origins_df, lanes_df, destinations_df, planning_horizon
 
@@ -542,15 +584,15 @@ def test_capacity_feasibility_detection(problem):
     error_message = str(exc_info.value)
 
     # Assert the error message contains the required values
-    assert str(total_demand) in error_message, (
-        f"Error message should contain total demand ({total_demand}): {error_message}"
-    )
-    assert str(total_capacity) in error_message, (
-        f"Error message should contain total capacity ({total_capacity}): {error_message}"
-    )
-    assert str(shortfall) in error_message, (
-        f"Error message should contain shortfall ({shortfall}): {error_message}"
-    )
+    assert (
+        str(total_demand) in error_message
+    ), f"Error message should contain total demand ({total_demand}): {error_message}"
+    assert (
+        str(total_capacity) in error_message
+    ), f"Error message should contain total capacity ({total_capacity}): {error_message}"
+    assert (
+        str(shortfall) in error_message
+    ), f"Error message should contain shortfall ({shortfall}): {error_message}"
 
 
 # ---------------------------------------------------------------------------
@@ -602,7 +644,9 @@ def feasible_problem(draw):
         # Max demand per destination in this period
         max_demand_per_dest = int(total_capacity_per_period / n_destinations)
         for d_id in destination_ids:
-            demand_val = float(draw(st.integers(min_value=0, max_value=max(0, max_demand_per_dest))))
+            demand_val = float(
+                draw(st.integers(min_value=0, max_value=max(0, max_demand_per_dest)))
+            )
             demand_dest_ids.append(d_id)
             demand_dates.append(period_date)
             demand_values.append(demand_val)
@@ -634,7 +678,11 @@ def feasible_problem(draw):
             "destination_id": lane_dest_ids,
             "unit_cost": lane_costs,
         },
-        schema={"origin_id": pl.Utf8, "destination_id": pl.Utf8, "unit_cost": pl.Float64},
+        schema={
+            "origin_id": pl.Utf8,
+            "destination_id": pl.Utf8,
+            "unit_cost": pl.Float64,
+        },
     )
 
     origins_df = pl.DataFrame(
@@ -648,8 +696,7 @@ def feasible_problem(draw):
     include_holding_cost = draw(st.booleans())
     if include_holding_cost:
         holding_costs = [
-            float(draw(st.integers(min_value=0, max_value=10)))
-            for _ in destination_ids
+            float(draw(st.integers(min_value=0, max_value=10))) for _ in destination_ids
         ]
         destinations_df = pl.DataFrame(
             {
@@ -674,7 +721,14 @@ def feasible_problem(draw):
     else:
         initial_inventory = None
 
-    return (demand_ts, origins_df, lanes_df, destinations_df, planning_horizon, initial_inventory)
+    return (
+        demand_ts,
+        origins_df,
+        lanes_df,
+        destinations_df,
+        planning_horizon,
+        initial_inventory,
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -698,7 +752,14 @@ def test_inventory_balance_invariant(problem):
     **Validates: Requirements 2.1, 2.2, 2.3**
     """
     # Feature: multi-period-optimization, Property 1: Inventory Balance Invariant
-    demand_ts, origins_df, lanes_df, destinations_df, planning_horizon, initial_inventory = problem
+    (
+        demand_ts,
+        origins_df,
+        lanes_df,
+        destinations_df,
+        planning_horizon,
+        initial_inventory,
+    ) = problem
 
     optimizer = MultiPeriodOptimizer()
     result = optimizer.solve(
@@ -715,7 +776,9 @@ def test_inventory_balance_invariant(problem):
     for row in demand_ts.to_dicts():
         key = (row["destination_id"], row["date"])
         # Sum duplicates (matching preprocessing behavior)
-        demand_map[key] = demand_map.get(key, 0.0) + (row["demand"] if row["demand"] is not None else 0.0)
+        demand_map[key] = demand_map.get(key, 0.0) + (
+            row["demand"] if row["demand"] is not None else 0.0
+        )
 
     # Build inventory lookup: (destination_id, period) -> inventory value
     inv_map: dict[tuple[str, date], float] = {}
@@ -799,8 +862,11 @@ def feasible_problem(draw):
     for _ in range(n_origins):
         cap = draw(
             st.floats(
-                min_value=1.0, max_value=100.0,
-                allow_nan=False, allow_infinity=False, allow_subnormal=False,
+                min_value=1.0,
+                max_value=100.0,
+                allow_nan=False,
+                allow_infinity=False,
+                allow_subnormal=False,
             )
         )
         capacities.append(cap)
@@ -823,8 +889,11 @@ def feasible_problem(draw):
                 max_demand = 0.0
             demand_val = draw(
                 st.floats(
-                    min_value=0.0, max_value=max(0.0, max_demand),
-                    allow_nan=False, allow_infinity=False, allow_subnormal=False,
+                    min_value=0.0,
+                    max_value=max(0.0, max_demand),
+                    allow_nan=False,
+                    allow_infinity=False,
+                    allow_subnormal=False,
                 )
             )
             period_demands.append(demand_val)
@@ -858,8 +927,11 @@ def feasible_problem(draw):
             lane_dest_ids.append(d_id)
             cost = draw(
                 st.floats(
-                    min_value=0.1, max_value=100.0,
-                    allow_nan=False, allow_infinity=False, allow_subnormal=False,
+                    min_value=0.1,
+                    max_value=100.0,
+                    allow_nan=False,
+                    allow_infinity=False,
+                    allow_subnormal=False,
                 )
             )
             lane_costs.append(cost)
@@ -870,7 +942,11 @@ def feasible_problem(draw):
             "destination_id": lane_dest_ids,
             "unit_cost": lane_costs,
         },
-        schema={"origin_id": pl.Utf8, "destination_id": pl.Utf8, "unit_cost": pl.Float64},
+        schema={
+            "origin_id": pl.Utf8,
+            "destination_id": pl.Utf8,
+            "unit_cost": pl.Float64,
+        },
     )
 
     # Build destinations_df (optionally with holding_cost)
@@ -880,8 +956,11 @@ def feasible_problem(draw):
         for _ in destination_ids:
             h_cost = draw(
                 st.floats(
-                    min_value=0.0, max_value=10.0,
-                    allow_nan=False, allow_infinity=False, allow_subnormal=False,
+                    min_value=0.0,
+                    max_value=10.0,
+                    allow_nan=False,
+                    allow_infinity=False,
+                    allow_subnormal=False,
                 )
             )
             holding_costs.append(h_cost)
@@ -905,15 +984,25 @@ def feasible_problem(draw):
         for d_id in destination_ids:
             inv_val = draw(
                 st.floats(
-                    min_value=0.0, max_value=20.0,
-                    allow_nan=False, allow_infinity=False, allow_subnormal=False,
+                    min_value=0.0,
+                    max_value=20.0,
+                    allow_nan=False,
+                    allow_infinity=False,
+                    allow_subnormal=False,
                 )
             )
             initial_inventory[d_id] = inv_val
     else:
         initial_inventory = None
 
-    return (demand_ts, origins_df, lanes_df, destinations_df, planning_horizon, initial_inventory)
+    return (
+        demand_ts,
+        origins_df,
+        lanes_df,
+        destinations_df,
+        planning_horizon,
+        initial_inventory,
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -935,7 +1024,14 @@ def test_capacity_constraint_invariant(problem):
     **Validates: Requirements 3.1, 3.2**
     """
     # Feature: multi-period-optimization, Property 2: Capacity Constraint Invariant
-    demand_ts, origins_df, lanes_df, destinations_df, planning_horizon, initial_inventory = problem
+    (
+        demand_ts,
+        origins_df,
+        lanes_df,
+        destinations_df,
+        planning_horizon,
+        initial_inventory,
+    ) = problem
 
     optimizer = MultiPeriodOptimizer()
     result = optimizer.solve(
@@ -968,7 +1064,11 @@ def test_capacity_constraint_invariant(problem):
             origin_period_flows = flows_df.filter(
                 (pl.col("origin_id") == origin_id) & (pl.col("period") == t)
             )
-            total_flow = origin_period_flows["flow"].sum() if not origin_period_flows.is_empty() else 0.0
+            total_flow = (
+                origin_period_flows["flow"].sum()
+                if not origin_period_flows.is_empty()
+                else 0.0
+            )
 
             assert total_flow <= daily_capacity + 1e-6, (
                 f"Capacity constraint violated for origin '{origin_id}' at period {t}: "
@@ -1016,7 +1116,14 @@ def feasible_problem(draw):
             demand_dest_ids.append(d_id)
             demand_dates.append(dt)
             demand_values.append(
-                draw(st.floats(min_value=0.0, max_value=50.0, allow_nan=False, allow_infinity=False))
+                draw(
+                    st.floats(
+                        min_value=0.0,
+                        max_value=50.0,
+                        allow_nan=False,
+                        allow_infinity=False,
+                    )
+                )
             )
 
     demand_ts = pl.DataFrame(
@@ -1033,8 +1140,7 @@ def feasible_problem(draw):
     max_period_demand = 0.0
     for t_idx in range(n_periods):
         period_demand = sum(
-            demand_values[d_idx * n_periods + t_idx]
-            for d_idx in range(n_destinations)
+            demand_values[d_idx * n_periods + t_idx] for d_idx in range(n_destinations)
         )
         max_period_demand = max(max_period_demand, period_demand)
 
@@ -1048,7 +1154,14 @@ def feasible_problem(draw):
             lane_origins.append(o_id)
             lane_dests.append(d_id)
             lane_costs.append(
-                draw(st.floats(min_value=0.1, max_value=100.0, allow_nan=False, allow_infinity=False))
+                draw(
+                    st.floats(
+                        min_value=0.1,
+                        max_value=100.0,
+                        allow_nan=False,
+                        allow_infinity=False,
+                    )
+                )
             )
 
     lanes_df = pl.DataFrame(
@@ -1057,7 +1170,11 @@ def feasible_problem(draw):
             "destination_id": lane_dests,
             "unit_cost": lane_costs,
         },
-        schema={"origin_id": pl.Utf8, "destination_id": pl.Utf8, "unit_cost": pl.Float64},
+        schema={
+            "origin_id": pl.Utf8,
+            "destination_id": pl.Utf8,
+            "unit_cost": pl.Float64,
+        },
     )
 
     # Generate capacities: ensure per-period total capacity >= max period demand
@@ -1086,7 +1203,11 @@ def feasible_problem(draw):
     include_holding_cost = draw(st.booleans())
     if include_holding_cost:
         holding_costs = [
-            draw(st.floats(min_value=0.0, max_value=10.0, allow_nan=False, allow_infinity=False))
+            draw(
+                st.floats(
+                    min_value=0.0, max_value=10.0, allow_nan=False, allow_infinity=False
+                )
+            )
             for _ in destination_ids
         ]
         destinations_df = pl.DataFrame(
@@ -1105,7 +1226,14 @@ def feasible_problem(draw):
     # No initial inventory — avoids infeasibility edge cases
     initial_inventory = None
 
-    return (demand_ts, origins_df, lanes_df, destinations_df, planning_horizon, initial_inventory)
+    return (
+        demand_ts,
+        origins_df,
+        lanes_df,
+        destinations_df,
+        planning_horizon,
+        initial_inventory,
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -1126,7 +1254,14 @@ def test_non_negativity_invariant(problem):
     **Validates: Requirements 1.3**
     """
     # Feature: multi-period-optimization, Property 3: Non-Negativity Invariant
-    demand_ts, origins_df, lanes_df, destinations_df, planning_horizon, initial_inventory = problem
+    (
+        demand_ts,
+        origins_df,
+        lanes_df,
+        destinations_df,
+        planning_horizon,
+        initial_inventory,
+    ) = problem
 
     optimizer = MultiPeriodOptimizer()
     result = optimizer.solve(
@@ -1172,7 +1307,14 @@ def test_objective_value_consistency(problem):
     **Validates: Requirements 4.2, 4.3, 6.3**
     """
     # Feature: multi-period-optimization, Property 4: Objective Value Consistency
-    demand_ts, origins_df, lanes_df, destinations_df, planning_horizon, initial_inventory = problem
+    (
+        demand_ts,
+        origins_df,
+        lanes_df,
+        destinations_df,
+        planning_horizon,
+        initial_inventory,
+    ) = problem
 
     optimizer = MultiPeriodOptimizer()
     result = optimizer.solve(
@@ -1250,12 +1392,13 @@ def test_objective_value_consistency(problem):
         f"  computed holding_cost_total = {holding_cost_total}\n"
         f"  difference = {abs(result.holding_cost - holding_cost_total)}"
     )
-    assert result.transportation_cost + result.holding_cost == pytest.approx(result.total_cost, abs=tolerance), (
+    assert result.transportation_cost + result.holding_cost == pytest.approx(
+        result.total_cost, abs=tolerance
+    ), (
         f"transportation_cost + holding_cost != total_cost:\n"
         f"  {result.transportation_cost} + {result.holding_cost} = "
         f"{result.transportation_cost + result.holding_cost} vs {result.total_cost}"
     )
-
 
 
 # ---------------------------------------------------------------------------
@@ -1278,7 +1421,14 @@ def test_output_completeness(problem):
     **Validates: Requirements 6.1, 6.2, 6.4**
     """
     # Feature: multi-period-optimization, Property 5: Output Completeness
-    demand_ts, origins_df, lanes_df, destinations_df, planning_horizon, initial_inventory = problem
+    (
+        demand_ts,
+        origins_df,
+        lanes_df,
+        destinations_df,
+        planning_horizon,
+        initial_inventory,
+    ) = problem
 
     optimizer = MultiPeriodOptimizer()
     result = optimizer.solve(
@@ -1304,9 +1454,9 @@ def test_output_completeness(problem):
     # 2. Assert all flow values exceed 1e-6
     if not result.flows.is_empty():
         min_flow = result.flows["flow"].min()
-        assert min_flow > 1e-6, (
-            f"Flow value below threshold: min flow = {min_flow}, expected > 1e-6"
-        )
+        assert (
+            min_flow > 1e-6
+        ), f"Flow value below threshold: min flow = {min_flow}, expected > 1e-6"
 
     # 3. Assert flows schema is [origin_id: Utf8, destination_id: Utf8, period: Date, flow: Float64]
     expected_flows_schema = {
@@ -1316,9 +1466,9 @@ def test_output_completeness(problem):
         "flow": pl.Float64,
     }
     actual_flows_schema = dict(result.flows.schema)
-    assert actual_flows_schema == expected_flows_schema, (
-        f"Flows schema mismatch:\n  expected: {expected_flows_schema}\n  actual: {actual_flows_schema}"
-    )
+    assert (
+        actual_flows_schema == expected_flows_schema
+    ), f"Flows schema mismatch:\n  expected: {expected_flows_schema}\n  actual: {actual_flows_schema}"
 
     # 4. Assert inventory schema is [destination_id: Utf8, period: Date, inventory: Float64]
     expected_inventory_schema = {
@@ -1327,8 +1477,6 @@ def test_output_completeness(problem):
         "inventory": pl.Float64,
     }
     actual_inventory_schema = dict(result.inventory.schema)
-    assert actual_inventory_schema == expected_inventory_schema, (
-        f"Inventory schema mismatch:\n  expected: {expected_inventory_schema}\n  actual: {actual_inventory_schema}"
-    )
-
-
+    assert (
+        actual_inventory_schema == expected_inventory_schema
+    ), f"Inventory schema mismatch:\n  expected: {expected_inventory_schema}\n  actual: {actual_inventory_schema}"

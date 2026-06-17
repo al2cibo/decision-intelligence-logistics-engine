@@ -178,9 +178,7 @@ def validate_non_negative_costs(
             invalid_rows = negative_costs.select(
                 "origin_id", "destination_id", "unit_cost"
             ).to_dicts()
-            raise ValueError(
-                f"Negative unit_cost values found: {invalid_rows}"
-            )
+            raise ValueError(f"Negative unit_cost values found: {invalid_rows}")
 
     if destinations_df is not None and "holding_cost" in destinations_df.columns:
         negative_holding = destinations_df.filter(pl.col("holding_cost") < 0)
@@ -188,9 +186,7 @@ def validate_non_negative_costs(
             invalid_rows = negative_holding.select(
                 "destination_id", "holding_cost"
             ).to_dicts()
-            raise ValueError(
-                f"Negative holding_cost values found: {invalid_rows}"
-            )
+            raise ValueError(f"Negative holding_cost values found: {invalid_rows}")
 
 
 def validate_positive_capacities(origins_df: pl.DataFrame) -> None:
@@ -209,17 +205,13 @@ def validate_positive_capacities(origins_df: pl.DataFrame) -> None:
     if "daily_capacity" in origins_df.columns:
         invalid = origins_df.filter(pl.col("daily_capacity") <= 0)
         if not invalid.is_empty():
-            invalid_rows = invalid.select(
-                "origin_id", "daily_capacity"
-            ).to_dicts()
+            invalid_rows = invalid.select("origin_id", "daily_capacity").to_dicts()
             raise ValueError(
                 f"Non-positive daily_capacity values found: {invalid_rows}"
             )
 
 
-def validate_origins_in_lanes(
-    origins_df: pl.DataFrame, lanes_df: pl.DataFrame
-) -> None:
+def validate_origins_in_lanes(origins_df: pl.DataFrame, lanes_df: pl.DataFrame) -> None:
     """Raise ValueError if lanes reference origins not in origins_df.
 
     Parameters

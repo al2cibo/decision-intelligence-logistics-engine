@@ -62,7 +62,11 @@ class AggregatedForecastingResult:
         frames = []
         for outcome in self.successful:
             selected_fr = next(
-                (fr for fr in outcome.results if fr.model_name == outcome.selected.model_name),
+                (
+                    fr
+                    for fr in outcome.results
+                    if fr.model_name == outcome.selected.model_name
+                ),
                 None,
             )
             if selected_fr is None:
@@ -73,8 +77,9 @@ class AggregatedForecastingResult:
                 )
                 continue
             frames.append(
-                selected_fr.forecast_values
-                .with_columns(pl.lit(outcome.destination_id).alias("destination_id"))
+                selected_fr.forecast_values.with_columns(
+                    pl.lit(outcome.destination_id).alias("destination_id")
+                )
                 .rename({"forecast": "demand"})
                 .select(["destination_id", "date", "demand"])
             )
@@ -198,7 +203,7 @@ class PerDestinationForecastingPipeline:
         """
         try:
             # Deterministic seed derived per destination — independent of run order
-            # The seeds are suefule for the forecasting models composed by stochastic components 
+            # The seeds are suefule for the forecasting models composed by stochastic components
             # (e.g. SARIMAX/ETS models).
             dest_seed = abs(hash(destination_id)) ^ self.random_seed
             np.random.seed(dest_seed % (2**32))
@@ -238,22 +243,26 @@ class PerDestinationForecastingPipeline:
                         pl.col(model.forecast_col).alias("forecast").cast(pl.Float64),
                     )
 
-                    results.append(ForecastResult(
-                        destination_id=destination_id,
-                        model_name=model.name,
-                        train_period=train_period,
-                        validation_period=validation_period,
-                        forecast_values=forecast_values,
-                        metrics=metrics,
-                        execution_time_seconds=execution_time,
-                        model_parameters=dict(model_kwargs),
-                    ))
+                    results.append(
+                        ForecastResult(
+                            destination_id=destination_id,
+                            model_name=model.name,
+                            train_period=train_period,
+                            validation_period=validation_period,
+                            forecast_values=forecast_values,
+                            metrics=metrics,
+                            execution_time_seconds=execution_time,
+                            model_parameters=dict(model_kwargs),
+                        )
+                    )
                     model_metrics.append((model.name, metrics))
 
                 except Exception as exc:
                     logger.error(
                         "Model '%s' failed for destination '%s': %s",
-                        model_name, destination_id, exc,
+                        model_name,
+                        destination_id,
+                        exc,
                     )
 
             if not results:
@@ -279,9 +288,7 @@ class PerDestinationForecastingPipeline:
                 error=str(exc),
             )
 
-    def _split_train_test(
-        self, df: pl.DataFrame
-    ) -> tuple[pl.DataFrame, pl.DataFrame]:
+    def _split_train_test(self, df: pl.DataFrame) -> tuple[pl.DataFrame, pl.DataFrame]:
         """Split a date-sorted DataFrame into train/test by train_ratio.
 
         Uses ``floor(n * train_ratio)`` rows for training; the remainder for testing.

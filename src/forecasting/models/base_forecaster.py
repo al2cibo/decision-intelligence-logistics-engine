@@ -69,9 +69,13 @@ class BaseForecaster(ABC):
                 )
 
         if target_col not in df.columns:
-            raise ValueError(f"Required column '{target_col}' is missing from the DataFrame")
+            raise ValueError(
+                f"Required column '{target_col}' is missing from the DataFrame"
+            )
         if forecast_col not in df.columns:
-            raise ValueError(f"Required column '{forecast_col}' is missing from the DataFrame")
+            raise ValueError(
+                f"Required column '{forecast_col}' is missing from the DataFrame"
+            )
 
         if df[forecast_col].is_null().all():
             raise ValueError(

@@ -5,7 +5,9 @@ from datetime import date
 import polars as pl
 
 
-def preprocess_demand(demand_ts: pl.DataFrame, planning_horizon: list[date]) -> pl.DataFrame:
+def preprocess_demand(
+    demand_ts: pl.DataFrame, planning_horizon: list[date]
+) -> pl.DataFrame:
     """Preprocess demand time series before LP formulation.
 
     Steps:
@@ -37,8 +39,6 @@ def preprocess_demand(demand_ts: pl.DataFrame, planning_horizon: list[date]) -> 
     demand_ts = demand_ts.with_columns(pl.col("demand").fill_null(0))
 
     # 3. Deduplicate: sum demand for duplicate (destination_id, date) pairs
-    demand_ts = demand_ts.group_by("destination_id", "date").agg(
-        pl.col("demand").sum()
-    )
+    demand_ts = demand_ts.group_by("destination_id", "date").agg(pl.col("demand").sum())
 
     return demand_ts

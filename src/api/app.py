@@ -20,7 +20,7 @@ from api.models import (
     PlanRequest,
     PlanResponse,
 )
-from utils.config import PerDestinationConfig
+from forecasting.config import PerDestinationConfig
 
 logger = logging.getLogger(__name__)
 
@@ -34,6 +34,7 @@ app = FastAPI(
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _build_forecast_config(
     model_names: list[str],
@@ -56,9 +57,9 @@ def _build_forecast_config(
 
 
 def _to_demand_df(records) -> pl.DataFrame:
-    return pl.DataFrame(
-        [r.model_dump() for r in records]
-    ).cast({"date": pl.Date, "demand": pl.Float64})
+    return pl.DataFrame([r.model_dump() for r in records]).cast(
+        {"date": pl.Date, "demand": pl.Float64}
+    )
 
 
 def _to_origins_df(records) -> pl.DataFrame:
@@ -150,8 +151,7 @@ def _extract_demand_ts(forecast_result) -> pl.DataFrame:
         if selected_fr is None:
             continue
         dest_df = (
-            selected_fr.forecast_values
-            .drop_nulls("forecast")
+            selected_fr.forecast_values.drop_nulls("forecast")
             .with_columns(pl.lit(outcome.destination_id).alias("destination_id"))
             .rename({"forecast": "demand"})
             .select(["destination_id", "date", "demand"])
@@ -167,6 +167,7 @@ def _extract_demand_ts(forecast_result) -> pl.DataFrame:
 # ---------------------------------------------------------------------------
 # Routes
 # ---------------------------------------------------------------------------
+
 
 @app.get("/health")
 def health() -> dict:

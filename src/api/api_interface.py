@@ -5,7 +5,9 @@ from datetime import date
 
 import polars as pl
 
-from forecasting.pipeline.per_destination_forecasting_pipeline import AggregatedForecastingResult
+from forecasting.pipeline.per_destination_forecasting_pipeline import (
+    AggregatedForecastingResult,
+)
 from optimization import MultiPeriodResult
 
 

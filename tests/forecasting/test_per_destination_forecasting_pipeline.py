@@ -15,7 +15,6 @@ from forecasting.pipeline.per_destination_forecasting_pipeline import (
     PerDestinationForecastingPipeline,
 )
 
-
 # --- Helpers ---
 
 
@@ -26,9 +25,7 @@ def _make_registry_with_naive_and_seasonal() -> ModelRegistry:
 
     registry = ModelRegistry()
     registry.register("naive_forecaster", lambda **kw: NaiveForecaster(**kw))
-    registry.register(
-        "seasonal_forecaster", lambda **kw: SeasonalForecaster(**kw)
-    )
+    registry.register("seasonal_forecaster", lambda **kw: SeasonalForecaster(**kw))
     return registry
 
 
@@ -53,9 +50,7 @@ def _make_multi_destination_df(
     dest_ids: list[str], n_rows_per_dest: int = 30
 ) -> pl.DataFrame:
     """Create a DataFrame with multiple destinations."""
-    frames = [
-        _make_destination_df(dest_id, n_rows_per_dest) for dest_id in dest_ids
-    ]
+    frames = [_make_destination_df(dest_id, n_rows_per_dest) for dest_id in dest_ids]
     return pl.concat(frames)
 
 

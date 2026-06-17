@@ -92,7 +92,9 @@ class TestForecastResult:
             )
 
     def test_negative_execution_time_raises(self, valid_forecast_values: pl.DataFrame):
-        with pytest.raises(ValueError, match="execution_time_seconds must be non-negative"):
+        with pytest.raises(
+            ValueError, match="execution_time_seconds must be non-negative"
+        ):
             ForecastResult(
                 destination_id="dest_001",
                 model_name="naive_forecaster",
@@ -168,7 +170,9 @@ class TestForecastResult:
                 model_parameters={},
             )
 
-    def test_metrics_without_known_keys_raises(self, valid_forecast_values: pl.DataFrame):
+    def test_metrics_without_known_keys_raises(
+        self, valid_forecast_values: pl.DataFrame
+    ):
         with pytest.raises(ValueError, match="metrics must contain at least one key"):
             ForecastResult(
                 destination_id="dest_001",

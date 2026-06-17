@@ -2,7 +2,11 @@
 
 import polars as pl
 
-from data.processing.validation import validate_columns, validate_no_nulls, validate_non_empty
+from data.processing.validation import (
+    validate_columns,
+    validate_no_nulls,
+    validate_non_empty,
+)
 
 
 class DemandProcessor:

@@ -23,7 +23,7 @@ from data.ingestion import Reader
 from data.processing.data_processor import DataProcessor
 from forecasting import create_forecasting_pipeline, AggregatedForecastingResult
 from optimization import MultiPeriodOptimizer, MultiPeriodResult
-from utils.config import ExperimentConfig, load_experiment_config
+from experiment_config import ExperimentConfig, load_experiment_config
 from utils.system_paths import get_project_root
 
 logging.basicConfig(

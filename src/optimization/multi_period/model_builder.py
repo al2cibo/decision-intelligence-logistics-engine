@@ -94,7 +94,9 @@ def create_variables(
     inv_vars: InventoryVars = {}
     for d_id in lookups.destinations:
         for t in planning_horizon:
-            inv_vars[(d_id, t)] = solver.NumVar(0.0, solver.infinity(), f"inv_{d_id}_{t}")
+            inv_vars[(d_id, t)] = solver.NumVar(
+                0.0, solver.infinity(), f"inv_{d_id}_{t}"
+            )
 
     return flow_vars, inv_vars
 

@@ -4,9 +4,13 @@ import pytest
 import polars as pl
 from datetime import date, timedelta
 
-from forecasting.pipeline.forecasting_pipeline_factory import create_forecasting_pipeline
-from forecasting.pipeline.per_destination_forecasting_pipeline import PerDestinationForecastingPipeline
-from utils.config import PerDestinationConfig
+from forecasting.pipeline.forecasting_pipeline_factory import (
+    create_forecasting_pipeline,
+)
+from forecasting.pipeline.per_destination_forecasting_pipeline import (
+    PerDestinationForecastingPipeline,
+)
+from forecasting.config import PerDestinationConfig
 
 
 class TestCreateForecastingPipeline:

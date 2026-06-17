@@ -7,7 +7,7 @@ import polars as pl
 from api.api_interface import APIInterface
 from forecasting import AggregatedForecastingResult, create_forecasting_pipeline
 from optimization import MultiPeriodOptimizer, MultiPeriodResult
-from utils.config import PerDestinationConfig
+from forecasting.config import PerDestinationConfig
 
 
 class LogisticsAPI(APIInterface):

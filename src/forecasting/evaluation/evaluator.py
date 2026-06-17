@@ -63,7 +63,9 @@ class Evaluator:
             Dictionary with keys 'mae', 'mse', 'rmse', 'mape', 'wape'
             and their corresponding metric values.
         """
-        filtered_df = self._delete_null_values(self.df, forecast_col_name=forecast_col_name)
+        filtered_df = self._delete_null_values(
+            self.df, forecast_col_name=forecast_col_name
+        )
 
         if filtered_df.is_empty():
             return {

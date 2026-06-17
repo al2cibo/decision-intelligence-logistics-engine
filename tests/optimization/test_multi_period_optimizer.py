@@ -7,7 +7,6 @@ import pytest
 
 from optimization import MultiPeriodOptimizer
 
-
 # ---------------------------------------------------------------------------
 # Fixtures: minimal valid inputs
 # ---------------------------------------------------------------------------
@@ -69,7 +68,11 @@ class TestEmptyInputValidation:
     """Test empty demand, origins, lanes, planning_horizon raise ValueError."""
 
     def test_empty_demand_raises(
-        self, valid_origins_df, valid_lanes_df, valid_destinations_df, valid_planning_horizon
+        self,
+        valid_origins_df,
+        valid_lanes_df,
+        valid_destinations_df,
+        valid_planning_horizon,
     ):
         empty_demand = pl.DataFrame(
             {"destination_id": [], "date": [], "demand": []},
@@ -86,7 +89,11 @@ class TestEmptyInputValidation:
             )
 
     def test_empty_origins_raises(
-        self, valid_demand_ts, valid_lanes_df, valid_destinations_df, valid_planning_horizon
+        self,
+        valid_demand_ts,
+        valid_lanes_df,
+        valid_destinations_df,
+        valid_planning_horizon,
     ):
         empty_origins = pl.DataFrame(
             {"origin_id": [], "daily_capacity": []},
@@ -103,11 +110,19 @@ class TestEmptyInputValidation:
             )
 
     def test_empty_lanes_raises(
-        self, valid_demand_ts, valid_origins_df, valid_destinations_df, valid_planning_horizon
+        self,
+        valid_demand_ts,
+        valid_origins_df,
+        valid_destinations_df,
+        valid_planning_horizon,
     ):
         empty_lanes = pl.DataFrame(
             {"origin_id": [], "destination_id": [], "unit_cost": []},
-            schema={"origin_id": pl.Utf8, "destination_id": pl.Utf8, "unit_cost": pl.Float64},
+            schema={
+                "origin_id": pl.Utf8,
+                "destination_id": pl.Utf8,
+                "unit_cost": pl.Float64,
+            },
         )
         optimizer = MultiPeriodOptimizer()
         with pytest.raises(ValueError, match="Lanes DataFrame is empty"):
@@ -142,7 +157,11 @@ class TestSchemaValidation:
     """Test missing schema columns raise ValueError."""
 
     def test_missing_destination_id_column(
-        self, valid_origins_df, valid_lanes_df, valid_destinations_df, valid_planning_horizon
+        self,
+        valid_origins_df,
+        valid_lanes_df,
+        valid_destinations_df,
+        valid_planning_horizon,
     ):
         bad_demand = pl.DataFrame(
             {
@@ -151,7 +170,9 @@ class TestSchemaValidation:
             }
         )
         optimizer = MultiPeriodOptimizer()
-        with pytest.raises(ValueError, match="Demand time series missing required columns"):
+        with pytest.raises(
+            ValueError, match="Demand time series missing required columns"
+        ):
             optimizer.solve(
                 bad_demand,
                 valid_origins_df,
@@ -161,7 +182,11 @@ class TestSchemaValidation:
             )
 
     def test_missing_date_column(
-        self, valid_origins_df, valid_lanes_df, valid_destinations_df, valid_planning_horizon
+        self,
+        valid_origins_df,
+        valid_lanes_df,
+        valid_destinations_df,
+        valid_planning_horizon,
     ):
         bad_demand = pl.DataFrame(
             {
@@ -170,7 +195,9 @@ class TestSchemaValidation:
             }
         )
         optimizer = MultiPeriodOptimizer()
-        with pytest.raises(ValueError, match="Demand time series missing required columns"):
+        with pytest.raises(
+            ValueError, match="Demand time series missing required columns"
+        ):
             optimizer.solve(
                 bad_demand,
                 valid_origins_df,
@@ -180,7 +207,11 @@ class TestSchemaValidation:
             )
 
     def test_missing_demand_column(
-        self, valid_origins_df, valid_lanes_df, valid_destinations_df, valid_planning_horizon
+        self,
+        valid_origins_df,
+        valid_lanes_df,
+        valid_destinations_df,
+        valid_planning_horizon,
     ):
         bad_demand = pl.DataFrame(
             {
@@ -189,7 +220,9 @@ class TestSchemaValidation:
             }
         )
         optimizer = MultiPeriodOptimizer()
-        with pytest.raises(ValueError, match="Demand time series missing required columns"):
+        with pytest.raises(
+            ValueError, match="Demand time series missing required columns"
+        ):
             optimizer.solve(
                 bad_demand,
                 valid_origins_df,
@@ -199,11 +232,17 @@ class TestSchemaValidation:
             )
 
     def test_missing_multiple_columns(
-        self, valid_origins_df, valid_lanes_df, valid_destinations_df, valid_planning_horizon
+        self,
+        valid_origins_df,
+        valid_lanes_df,
+        valid_destinations_df,
+        valid_planning_horizon,
     ):
         bad_demand = pl.DataFrame({"some_col": [1.0]})
         optimizer = MultiPeriodOptimizer()
-        with pytest.raises(ValueError, match="Demand time series missing required columns"):
+        with pytest.raises(
+            ValueError, match="Demand time series missing required columns"
+        ):
             optimizer.solve(
                 bad_demand,
                 valid_origins_df,
@@ -222,7 +261,11 @@ class TestValueValidation:
     """Test negative costs, non-positive capacities, negative initial inventory."""
 
     def test_negative_unit_cost_raises(
-        self, valid_demand_ts, valid_origins_df, valid_destinations_df, valid_planning_horizon
+        self,
+        valid_demand_ts,
+        valid_origins_df,
+        valid_destinations_df,
+        valid_planning_horizon,
     ):
         bad_lanes = pl.DataFrame(
             {
@@ -261,7 +304,11 @@ class TestValueValidation:
             )
 
     def test_zero_capacity_raises(
-        self, valid_demand_ts, valid_lanes_df, valid_destinations_df, valid_planning_horizon
+        self,
+        valid_demand_ts,
+        valid_lanes_df,
+        valid_destinations_df,
+        valid_planning_horizon,
     ):
         bad_origins = pl.DataFrame(
             {
@@ -270,7 +317,9 @@ class TestValueValidation:
             }
         )
         optimizer = MultiPeriodOptimizer()
-        with pytest.raises(ValueError, match="Non-positive daily_capacity values found"):
+        with pytest.raises(
+            ValueError, match="Non-positive daily_capacity values found"
+        ):
             optimizer.solve(
                 valid_demand_ts,
                 bad_origins,
@@ -280,7 +329,11 @@ class TestValueValidation:
             )
 
     def test_negative_capacity_raises(
-        self, valid_demand_ts, valid_lanes_df, valid_destinations_df, valid_planning_horizon
+        self,
+        valid_demand_ts,
+        valid_lanes_df,
+        valid_destinations_df,
+        valid_planning_horizon,
     ):
         bad_origins = pl.DataFrame(
             {
@@ -289,7 +342,9 @@ class TestValueValidation:
             }
         )
         optimizer = MultiPeriodOptimizer()
-        with pytest.raises(ValueError, match="Non-positive daily_capacity values found"):
+        with pytest.raises(
+            ValueError, match="Non-positive daily_capacity values found"
+        ):
             optimizer.solve(
                 valid_demand_ts,
                 bad_origins,
@@ -299,7 +354,12 @@ class TestValueValidation:
             )
 
     def test_negative_initial_inventory_raises(
-        self, valid_demand_ts, valid_origins_df, valid_lanes_df, valid_destinations_df, valid_planning_horizon
+        self,
+        valid_demand_ts,
+        valid_origins_df,
+        valid_lanes_df,
+        valid_destinations_df,
+        valid_planning_horizon,
     ):
         optimizer = MultiPeriodOptimizer()
         with pytest.raises(
@@ -458,9 +518,12 @@ class TestIntegrationEndToEnd:
             {
                 "destination_id": ["D1", "D2"] * 3,
                 "date": [
-                    date(2024, 1, 1), date(2024, 1, 1),
-                    date(2024, 1, 2), date(2024, 1, 2),
-                    date(2024, 1, 3), date(2024, 1, 3),
+                    date(2024, 1, 1),
+                    date(2024, 1, 1),
+                    date(2024, 1, 2),
+                    date(2024, 1, 2),
+                    date(2024, 1, 3),
+                    date(2024, 1, 3),
                 ],
                 "demand": [20.0, 15.0, 20.0, 15.0, 20.0, 15.0],
             }
@@ -502,20 +565,27 @@ class TestIntegrationEndToEnd:
         # Verify cost breakdown: no holding cost, so all cost is transportation
         assert result.transportation_cost == pytest.approx(150.0, abs=1e-4)
         assert result.holding_cost == pytest.approx(0.0, abs=1e-6)
-        assert result.transportation_cost + result.holding_cost == pytest.approx(result.total_cost, abs=1e-4)
+        assert result.transportation_cost + result.holding_cost == pytest.approx(
+            result.total_cost, abs=1e-4
+        )
 
         # Verify flows DataFrame is non-empty and has correct schema
         assert not result.flows.is_empty()
-        assert set(result.flows.columns) == {"origin_id", "destination_id", "period", "flow"}
+        assert set(result.flows.columns) == {
+            "origin_id",
+            "destination_id",
+            "period",
+            "flow",
+        }
 
         # Verify total flow to each destination across all periods equals total demand
         # D1 total demand = 60, D2 total demand = 45
-        d1_total_flow = result.flows.filter(
-            pl.col("destination_id") == "D1"
-        )["flow"].sum()
-        d2_total_flow = result.flows.filter(
-            pl.col("destination_id") == "D2"
-        )["flow"].sum()
+        d1_total_flow = result.flows.filter(pl.col("destination_id") == "D1")[
+            "flow"
+        ].sum()
+        d2_total_flow = result.flows.filter(pl.col("destination_id") == "D2")[
+            "flow"
+        ].sum()
         assert d1_total_flow == pytest.approx(60.0, abs=1e-6)
         assert d2_total_flow == pytest.approx(45.0, abs=1e-6)
 
@@ -566,14 +636,20 @@ class TestCostBreakdown:
     def test_no_holding_cost_column_breakdown(self):
         """When destinations_df has no holding_cost column, holding_cost == 0."""
         planning_horizon = [date(2024, 1, 1), date(2024, 1, 2)]
-        demand_ts = pl.DataFrame({
-            "destination_id": ["D1", "D1"],
-            "date": planning_horizon,
-            "demand": [10.0, 10.0],
-        })
+        demand_ts = pl.DataFrame(
+            {
+                "destination_id": ["D1", "D1"],
+                "date": planning_horizon,
+                "demand": [10.0, 10.0],
+            }
+        )
         origins_df = pl.DataFrame({"origin_id": ["O1"], "daily_capacity": [100.0]})
-        lanes_df = pl.DataFrame({"origin_id": ["O1"], "destination_id": ["D1"], "unit_cost": [3.0]})
-        destinations_df = pl.DataFrame({"destination_id": ["D1"]})  # no holding_cost column
+        lanes_df = pl.DataFrame(
+            {"origin_id": ["O1"], "destination_id": ["D1"], "unit_cost": [3.0]}
+        )
+        destinations_df = pl.DataFrame(
+            {"destination_id": ["D1"]}
+        )  # no holding_cost column
 
         result = MultiPeriodOptimizer().solve(
             demand_ts, origins_df, lanes_df, destinations_df, planning_horizon
@@ -596,14 +672,20 @@ class TestCostBreakdown:
           total_cost     = 45
         """
         planning_horizon = [date(2024, 1, 1), date(2024, 1, 2)]
-        demand_ts = pl.DataFrame({
-            "destination_id": ["D1", "D1"],
-            "date": planning_horizon,
-            "demand": [5.0, 15.0],
-        })
+        demand_ts = pl.DataFrame(
+            {
+                "destination_id": ["D1", "D1"],
+                "date": planning_horizon,
+                "demand": [5.0, 15.0],
+            }
+        )
         origins_df = pl.DataFrame({"origin_id": ["O1"], "daily_capacity": [10.0]})
-        lanes_df = pl.DataFrame({"origin_id": ["O1"], "destination_id": ["D1"], "unit_cost": [2.0]})
-        destinations_df = pl.DataFrame({"destination_id": ["D1"], "holding_cost": [1.0]})
+        lanes_df = pl.DataFrame(
+            {"origin_id": ["O1"], "destination_id": ["D1"], "unit_cost": [2.0]}
+        )
+        destinations_df = pl.DataFrame(
+            {"destination_id": ["D1"], "holding_cost": [1.0]}
+        )
 
         result = MultiPeriodOptimizer().solve(
             demand_ts, origins_df, lanes_df, destinations_df, planning_horizon
@@ -612,17 +694,29 @@ class TestCostBreakdown:
         assert result.total_cost == pytest.approx(45.0, abs=1e-4)
         assert result.transportation_cost == pytest.approx(40.0, abs=1e-4)
         assert result.holding_cost == pytest.approx(5.0, abs=1e-4)
-        assert result.transportation_cost + result.holding_cost == pytest.approx(result.total_cost, abs=1e-4)
+        assert result.transportation_cost + result.holding_cost == pytest.approx(
+            result.total_cost, abs=1e-4
+        )
 
     def test_breakdown_sums_to_total_cost_with_holding(
-        self, valid_demand_ts, valid_origins_df, valid_lanes_df, valid_destinations_df, valid_planning_horizon
+        self,
+        valid_demand_ts,
+        valid_origins_df,
+        valid_lanes_df,
+        valid_destinations_df,
+        valid_planning_horizon,
     ):
         """transportation_cost + holding_cost == total_cost for any valid solve."""
         result = MultiPeriodOptimizer().solve(
-            valid_demand_ts, valid_origins_df, valid_lanes_df, valid_destinations_df, valid_planning_horizon
+            valid_demand_ts,
+            valid_origins_df,
+            valid_lanes_df,
+            valid_destinations_df,
+            valid_planning_horizon,
         )
 
         assert result.transportation_cost >= 0.0
         assert result.holding_cost >= 0.0
-        assert result.transportation_cost + result.holding_cost == pytest.approx(result.total_cost, abs=1e-4)
-
+        assert result.transportation_cost + result.holding_cost == pytest.approx(
+            result.total_cost, abs=1e-4
+        )

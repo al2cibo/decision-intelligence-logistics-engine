@@ -24,7 +24,8 @@ from forecasting import create_forecasting_pipeline, AggregatedForecastingResult
 
 from optimization import MultiPeriodOptimizer, MultiPeriodResult
 
-from utils.config import load_config, PerDestinationConfig
+from utils.config import load_config
+from forecasting.config import PerDestinationConfig
 from utils.system_paths import get_project_root
 
 # ---------------------------------------------------------------------
@@ -130,7 +131,9 @@ def run_multi_period_optimization(
         planning_horizon=planning_horizon,
     )
 
-    logger.info("Multi-period optimization complete. Total cost: %.4f", result.total_cost)
+    logger.info(
+        "Multi-period optimization complete. Total cost: %.4f", result.total_cost
+    )
     logger.info("Flows (non-zero):\n%s", result.flows)
     logger.info("Inventory levels:\n%s", result.inventory)
 

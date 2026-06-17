@@ -4,10 +4,10 @@ from datetime import date
 
 from pydantic import BaseModel, Field
 
-
 # ---------------------------------------------------------------------------
 # Shared primitives
 # ---------------------------------------------------------------------------
+
 
 class DemandRecord(BaseModel):
     date: date
@@ -33,6 +33,7 @@ class DestinationRecord(BaseModel):
 # ---------------------------------------------------------------------------
 # /forecast
 # ---------------------------------------------------------------------------
+
 
 class ForecastRequest(BaseModel):
     demand_history: list[DemandRecord]
@@ -81,6 +82,7 @@ class ForecastResponse(BaseModel):
 # /optimize
 # ---------------------------------------------------------------------------
 
+
 class OptimizeRequest(BaseModel):
     demand_ts: list[DemandRecord]
     origins: list[OriginRecord]
@@ -111,6 +113,7 @@ class OptimizeResponse(BaseModel):
 # ---------------------------------------------------------------------------
 # /plan  (forecast + optimize in one call)
 # ---------------------------------------------------------------------------
+
 
 class PlanRequest(BaseModel):
     demand_history: list[DemandRecord]

@@ -8,8 +8,12 @@ from typing import Any
 
 import polars as pl
 
-from forecasting.pipeline.forecasting_pipeline_protocol import ForecastingPipelineProtocol
-from forecasting.pipeline.per_destination_forecasting_pipeline import PerDestinationForecastingPipeline
+from forecasting.pipeline.forecasting_pipeline_protocol import (
+    ForecastingPipelineProtocol,
+)
+from forecasting.pipeline.per_destination_forecasting_pipeline import (
+    PerDestinationForecastingPipeline,
+)
 from forecasting.registry.model_registry import ModelRegistry
 
 
@@ -60,11 +64,13 @@ class TestForecastingPipelineProtocolConformance:
             registry=registry,
             model_names=[],
         )
-        df = pl.DataFrame({
-            "date": [],
-            "destination_id": [],
-            "demand": [],
-        })
+        df = pl.DataFrame(
+            {
+                "date": [],
+                "destination_id": [],
+                "demand": [],
+            }
+        )
         # Should not raise TypeError
         result = pipeline.run(df, some_extra_kwarg="value")
         assert result is not None

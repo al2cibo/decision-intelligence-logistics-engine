@@ -22,7 +22,9 @@ class TestBaseForecasterEvaluate:
                 "naive_forecast": [12.0, 18.0, 33.0],
             }
         )
-        result = self.model.evaluate(df, target_col="demand", forecast_col="naive_forecast")
+        result = self.model.evaluate(
+            df, target_col="demand", forecast_col="naive_forecast"
+        )
         assert set(result.keys()) == {"wape", "mae", "rmse", "mape", "mse"}
 
     def test_all_values_are_floats(self):
@@ -32,7 +34,9 @@ class TestBaseForecasterEvaluate:
                 "naive_forecast": [12.0, 18.0, 33.0],
             }
         )
-        result = self.model.evaluate(df, target_col="demand", forecast_col="naive_forecast")
+        result = self.model.evaluate(
+            df, target_col="demand", forecast_col="naive_forecast"
+        )
         for key, value in result.items():
             assert isinstance(value, float), f"{key} is not a float: {type(value)}"
 
@@ -73,7 +77,9 @@ class TestBaseForecasterEvaluate:
                 "naive_forecast": [None, 20.0, 30.0],
             }
         )
-        result = self.model.evaluate(df, target_col="demand", forecast_col="naive_forecast")
+        result = self.model.evaluate(
+            df, target_col="demand", forecast_col="naive_forecast"
+        )
         # After null exclusion: demand=[20, 30], forecast=[20, 30] -> perfect
         assert result["mae"] == pytest.approx(0.0)
         assert result["mse"] == pytest.approx(0.0)
@@ -85,7 +91,9 @@ class TestBaseForecasterEvaluate:
                 "naive_forecast": [12.0, 20.0, 30.0],
             }
         )
-        result = self.model.evaluate(df, target_col="demand", forecast_col="naive_forecast")
+        result = self.model.evaluate(
+            df, target_col="demand", forecast_col="naive_forecast"
+        )
         # After null exclusion: demand=[20, 30], forecast=[20, 30] -> perfect
         assert result["mae"] == pytest.approx(0.0)
 
@@ -96,7 +104,9 @@ class TestBaseForecasterEvaluate:
                 "naive_forecast": [1.0, 2.0, 3.0],
             }
         )
-        result = self.model.evaluate(df, target_col="demand", forecast_col="naive_forecast")
+        result = self.model.evaluate(
+            df, target_col="demand", forecast_col="naive_forecast"
+        )
         assert math.isnan(result["wape"])
         # sklearn's MAPE divides by actual, so with zero actuals it may produce inf
         # but our WAPE should be NaN
@@ -110,7 +120,9 @@ class TestBaseForecasterEvaluate:
                 "naive_forecast": [1.0, None, 3.0],
             }
         ).cast({"demand": pl.Float64})
-        result = self.model.evaluate(df, target_col="demand", forecast_col="naive_forecast")
+        result = self.model.evaluate(
+            df, target_col="demand", forecast_col="naive_forecast"
+        )
         for key in ("wape", "mae", "rmse", "mape", "mse"):
             assert math.isnan(result[key]), f"{key} should be NaN but got {result[key]}"
 
@@ -133,7 +145,9 @@ class TestBaseForecasterEvaluate:
                 "naive_forecast": [12.0, 18.0, 33.0],
             }
         )
-        result = self.model.evaluate(df, target_col="demand", forecast_col="naive_forecast")
+        result = self.model.evaluate(
+            df, target_col="demand", forecast_col="naive_forecast"
+        )
 
         errors = np.array([2.0, 2.0, 3.0])
         expected_mae = np.mean(np.abs(errors))

@@ -88,8 +88,7 @@ def _validate_initial_inventory(initial_inventory: dict[str, float] | None) -> N
     for dest_id, value in initial_inventory.items():
         if value < 0:
             raise ValueError(
-                f"Negative initial inventory for destination '{dest_id}': "
-                f"{value}"
+                f"Negative initial inventory for destination '{dest_id}': " f"{value}"
             )
 
 

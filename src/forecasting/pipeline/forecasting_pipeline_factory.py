@@ -7,8 +7,10 @@ Provides `create_forecasting_pipeline` which:
 """
 
 from forecasting.registry.default_registry import create_default_registry
-from forecasting.pipeline.per_destination_forecasting_pipeline import PerDestinationForecastingPipeline
-from utils.config import PerDestinationConfig
+from forecasting.pipeline.per_destination_forecasting_pipeline import (
+    PerDestinationForecastingPipeline,
+)
+from forecasting.config import PerDestinationConfig
 
 
 def create_forecasting_pipeline(
