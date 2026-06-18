@@ -450,3 +450,134 @@ class TestPipelineRun:
         assert fr.forecast_values.schema["date"] == pl.Date
         assert fr.forecast_values.schema["forecast"] == pl.Float64
         assert "wape" in fr.metrics
+
+    def test_parallel_stochastic_models_equivalence(self):
+        """Parallel execution with ETS and SARIMAX produces same results as sequential.
+
+        Closes the gap identified in the v1.0 review: the existing
+        test_parallel_vs_sequential_equivalence only used NaiveForecaster.
+        This test runs both statsmodels-backed models (ETSForecaster,
+        SARIMAXForecaster) under max_workers=2 and verifies selected model
+        identity and metric values match the sequential run.
+        """
+        from forecasting.models.ets_forecaster import ETSForecaster
+        from forecasting.models.sarimax_forecaster import SARIMAXForecaster
+
+        registry = ModelRegistry()
+        registry.register(
+            "naive_forecaster",
+            lambda **kw: __import__(
+                "forecasting.models.naive_forecaster", fromlist=["NaiveForecaster"]
+            ).NaiveForecaster(**kw),
+        )
+        registry.register("ets_forecaster", lambda **kw: ETSForecaster(**kw))
+        registry.register("sarimax_forecaster", lambda **kw: SARIMAXForecaster(**kw))
+
+        # Use 40 rows so train=32, test=8 — enough for ETS/SARIMAX to fit
+        df = _make_multi_destination_df(
+            ["dest_A", "dest_B", "dest_C"], n_rows_per_dest=40
+        )
+
+        common_kwargs = dict(
+            registry=registry,
+            model_names=["naive_forecaster", "ets_forecaster", "sarimax_forecaster"],
+            train_ratio=0.8,
+            random_seed=42,
+        )
+
+        pipeline_seq = PerDestinationForecastingPipeline(max_workers=1, **common_kwargs)
+        pipeline_par = PerDestinationForecastingPipeline(max_workers=2, **common_kwargs)
+
+        result_seq = pipeline_seq.run(df)
+        result_par = pipeline_par.run(df)
+
+        assert len(result_seq.outcomes) == len(result_par.outcomes)
+
+        seq_by_dest = {o.destination_id: o for o in result_seq.outcomes}
+        par_by_dest = {o.destination_id: o for o in result_par.outcomes}
+
+        for dest_id in seq_by_dest:
+            seq_outcome = seq_by_dest[dest_id]
+            par_outcome = par_by_dest[dest_id]
+
+            assert seq_outcome.success == par_outcome.success, (
+                f"Success mismatch for {dest_id}: "
+                f"seq={seq_outcome.success}, par={par_outcome.success}"
+            )
+            assert seq_outcome.selected == par_outcome.selected, (
+                f"Selected model mismatch for {dest_id}: "
+                f"seq={seq_outcome.selected}, par={par_outcome.selected}"
+            )
+
+            if seq_outcome.results and par_outcome.results:
+                seq_results_by_name = {r.model_name: r for r in seq_outcome.results}
+                par_results_by_name = {r.model_name: r for r in par_outcome.results}
+                for model_name in seq_results_by_name:
+                    if model_name in par_results_by_name:
+                        sr = seq_results_by_name[model_name]
+                        pr = par_results_by_name[model_name]
+                        assert sr.metrics == pr.metrics, (
+                            f"Metric mismatch for {dest_id}/{model_name}: "
+                            f"seq={sr.metrics}, par={pr.metrics}"
+                        )
+                        assert sr.forecast_values.equals(
+                            pr.forecast_values
+                        ), f"Forecast mismatch for {dest_id}/{model_name}"
+
+    def test_all_nan_metric_destination_recorded_as_failed(self):
+        """When every model returns NaN for the selection metric, destination is failed.
+
+        This covers the edge case where all-zero demand causes WAPE=NaN for every
+        model, forcing PerDestinationModelSelector.select() to raise ValueError,
+        which the pipeline catches and records as a failed DestinationOutcome.
+        """
+        from forecasting.models.base_forecaster import BaseForecaster
+
+        class NaNMetricForecaster(BaseForecaster):
+            """Always returns a constant forecast equal to mean demand, forcing
+            WAPE=NaN when all actuals are zero."""
+
+            def __init__(self, **kwargs):
+                self.forecast_col = "nan_metric_forecast"
+
+            @property
+            def name(self) -> str:
+                return "nan_metric_forecaster"
+
+            def fit(self, df: pl.DataFrame) -> None:
+                pass
+
+            def predict(self, df: pl.DataFrame) -> pl.DataFrame:
+                # Return a non-null forecast so evaluate() proceeds, but against
+                # all-zero actuals WAPE = sum|0-c| / sum|0| = inf/0 = NaN
+                return df.with_columns(pl.lit(1.0).alias(self.forecast_col))
+
+        registry = ModelRegistry()
+        registry.register(
+            "nan_metric_forecaster", lambda **kw: NaNMetricForecaster(**kw)
+        )
+
+        pipeline = PerDestinationForecastingPipeline(
+            registry=registry,
+            model_names=["nan_metric_forecaster"],
+            train_ratio=0.8,
+            selection_metric="wape",
+            max_workers=1,
+        )
+
+        # Build a destination where all demand values are exactly 0
+        # so WAPE denominator = sum(|actual|) = 0 → NaN
+        df = pl.DataFrame(
+            {
+                "date": [date(2023, 1, 1) + timedelta(days=i) for i in range(20)],
+                "destination_id": ["zero_demand"] * 20,
+                "demand": [0.0] * 20,
+            }
+        ).cast({"date": pl.Date, "demand": pl.Float64})
+
+        result = pipeline.run(df)
+
+        # The destination should be recorded as failed because all metrics are NaN
+        assert len(result.failed) == 1
+        assert result.failed[0].destination_id == "zero_demand"
+        assert result.failed[0].success is False

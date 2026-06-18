@@ -1,4 +1,4 @@
-"""Run all three experiments in sequence and print a summary table.
+"""Run all four experiments in sequence and print a summary table.
 
 Usage (from any directory):
     PYTHONPATH=<project_root>/src python experiments/run_all.py
@@ -22,6 +22,7 @@ CONFIGS = [
     _HERE / "configs" / "baseline_naive.yaml",
     _HERE / "configs" / "baseline_global_ets.yaml",
     _HERE / "configs" / "model_selection.yaml",
+    _HERE / "configs" / "scale_test.yaml",
 ]
 
 
