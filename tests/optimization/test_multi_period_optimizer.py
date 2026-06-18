@@ -485,6 +485,60 @@ class TestSolverValidation:
 
 
 # ---------------------------------------------------------------------------
+# Tests: max_variables parameter
+# ---------------------------------------------------------------------------
+
+
+class TestMaxVariablesParameter:
+    """Test the configurable max_variables parameter on MultiPeriodOptimizer."""
+
+    def test_default_max_variables(self):
+        """Default max_variables matches the module-level MAX_VARIABLES constant."""
+        from optimization.validation import MAX_VARIABLES
+
+        optimizer = MultiPeriodOptimizer()
+        assert optimizer._max_variables == MAX_VARIABLES
+
+    def test_custom_max_variables_accepted(self):
+        """A custom positive max_variables is stored correctly."""
+        optimizer = MultiPeriodOptimizer(max_variables=500_000)
+        assert optimizer._max_variables == 500_000
+
+    def test_zero_max_variables_raises(self):
+        """max_variables=0 raises ValueError."""
+        with pytest.raises(
+            ValueError, match="max_variables must be a positive integer"
+        ):
+            MultiPeriodOptimizer(max_variables=0)
+
+    def test_negative_max_variables_raises(self):
+        """Negative max_variables raises ValueError."""
+        with pytest.raises(
+            ValueError, match="max_variables must be a positive integer"
+        ):
+            MultiPeriodOptimizer(max_variables=-1)
+
+    def test_custom_limit_enforced_on_solve(
+        self,
+        valid_demand_ts,
+        valid_origins_df,
+        valid_lanes_df,
+        valid_destinations_df,
+        valid_planning_horizon,
+    ):
+        """Setting max_variables=1 causes solve() to raise ValueError for any real problem."""
+        optimizer = MultiPeriodOptimizer(max_variables=1)
+        with pytest.raises(ValueError, match="Variable count .* exceeds maximum limit"):
+            optimizer.solve(
+                valid_demand_ts,
+                valid_origins_df,
+                valid_lanes_df,
+                valid_destinations_df,
+                valid_planning_horizon,
+            )
+
+
+# ---------------------------------------------------------------------------
 # Tests: End-to-end integration
 # ---------------------------------------------------------------------------
 
