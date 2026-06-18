@@ -1,0 +1,6 @@
+-r requirements.txt
+
+# Exploratory analysis and paper figures
+jupyter
+notebook
+fastparquet

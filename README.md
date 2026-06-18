@@ -76,6 +76,9 @@ python -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
 
+### Analysis Environment (notebooks-related dependencies)
+pip install -r requirements-analysis.txt
+
 # Run the full pipeline demo
 python scripts/example_end_to_end_pipeline.py
 
