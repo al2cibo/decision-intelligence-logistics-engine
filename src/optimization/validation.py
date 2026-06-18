@@ -137,6 +137,13 @@ def validate_origins_in_lanes(origins_df: pl.DataFrame, lanes_df: pl.DataFrame) 
 # ---------------------------------------------------------------------------
 
 MAX_VARIABLES = 1_000_000
+"""Default upper bound on the total LP decision-variable count.
+
+Equal to ``n_lanes × n_periods + n_destinations × n_periods``. Problems
+exceeding this limit are rejected before LP construction to prevent
+out-of-memory conditions. Override via the ``max_variables`` parameter on
+:class:`~optimization.optimizer.MultiPeriodOptimizer`.
+"""
 
 
 def validate_inputs(
@@ -146,8 +153,21 @@ def validate_inputs(
     destinations_df: pl.DataFrame,
     planning_horizon: list[date],
     initial_inventory: dict[str, float] | None,
+    max_variables: int = MAX_VARIABLES,
 ) -> None:
-    """Run structural validation. Raises ValueError on the first violation."""
+    """Run structural validation. Raises ValueError on the first violation.
+
+    Parameters
+    ----------
+    demand_ts, origins_df, lanes_df, destinations_df, planning_horizon,
+    initial_inventory
+        Standard optimizer inputs.
+    max_variables : int
+        Maximum allowed total decision-variable count
+        (``flow_vars + inventory_vars``). Defaults to ``MAX_VARIABLES``
+        (1 000 000). Pass a smaller value to enforce tighter memory limits,
+        or a larger value for large-scale problems on capable hardware.
+    """
     _validate_not_empty(demand_ts, origins_df, lanes_df, planning_horizon)
     validate_columns(
         demand_ts,
@@ -159,7 +179,7 @@ def validate_inputs(
     validate_positive_capacities(origins_df)
     validate_origins_in_lanes(origins_df, lanes_df)
     _validate_initial_inventory(initial_inventory)
-    _validate_variable_count(lanes_df, demand_ts, planning_horizon)
+    _validate_variable_count(lanes_df, demand_ts, planning_horizon, max_variables)
 
 
 def check_feasibility(
@@ -208,6 +228,7 @@ def _validate_variable_count(
     lanes_df: pl.DataFrame,
     demand_ts: pl.DataFrame,
     planning_horizon: list[date],
+    max_variables: int = MAX_VARIABLES,
 ) -> None:
     n_periods = len(planning_horizon)
     n_lanes = len(lanes_df)
@@ -217,10 +238,10 @@ def _validate_variable_count(
     inventory_vars = n_destinations * n_periods
     total_vars = flow_vars + inventory_vars
 
-    if total_vars > MAX_VARIABLES:
+    if total_vars > max_variables:
         raise ValueError(
             f"Variable count ({total_vars}) exceeds maximum limit "
-            f"({MAX_VARIABLES}). "
+            f"({max_variables}). "
             f"Flow variables: {flow_vars}, "
             f"inventory variables: {inventory_vars}."
         )
