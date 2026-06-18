@@ -41,18 +41,32 @@ class MultiPeriodOptimizer:
     solver_name : str, optional
         Backend solver to use (default ``"GLOP"``). Must be one of
         :pyattr:`SUPPORTED_SOLVERS`.
+    max_variables : int, optional
+        Upper bound on the total LP decision-variable count
+        (``n_lanes × n_periods + n_destinations × n_periods``). Problems
+        that exceed this limit raise ``ValueError`` before LP construction to
+        prevent out-of-memory conditions. Defaults to ``MAX_VARIABLES``
+        (1 000 000). Increase for large-scale problems on capable hardware;
+        decrease to enforce tighter memory limits in constrained environments.
     """
 
     SUPPORTED_SOLVERS = {"GLOP", "CBC"}
     MAX_VARIABLES = MAX_VARIABLES
 
-    def __init__(self, solver_name: str = "GLOP") -> None:
+    def __init__(
+        self, solver_name: str = "GLOP", max_variables: int = MAX_VARIABLES
+    ) -> None:
         if solver_name not in self.SUPPORTED_SOLVERS:
             raise ValueError(
                 f"Unsupported solver '{solver_name}'. "
                 f"Supported solvers: {sorted(self.SUPPORTED_SOLVERS)}"
             )
+        if max_variables < 1:
+            raise ValueError(
+                f"max_variables must be a positive integer, got {max_variables}"
+            )
         self._solver_name = solver_name
+        self._max_variables = max_variables
 
     def solve(
         self,
@@ -97,6 +111,7 @@ class MultiPeriodOptimizer:
             destinations_df,
             planning_horizon,
             initial_inventory,
+            max_variables=self._max_variables,
         )
         check_feasibility(demand_ts, origins_df, lanes_df, planning_horizon)
 
