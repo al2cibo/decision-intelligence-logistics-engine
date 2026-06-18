@@ -21,19 +21,43 @@ def generate_synthetic_logistics_data(
     start_date: datetime,
     end_date: datetime,
     seed: int = 42,
+    include_holding_cost: bool = False,
+    holding_cost_range: tuple[float, float] = (0.5, 2.0),
 ) -> None:
     """Generate a synthetic logistics dataset and write it to parquet files.
 
     Produces four files in ``output_dir``:
 
     - ``origins.parquet``        — origin_id, daily_capacity
-    - ``destinations.parquet``   — destination_id
+    - ``destinations.parquet``   — destination_id[, holding_cost]
     - ``lanes.parquet``          — origin_id, destination_id, unit_cost
     - ``demand_history.parquet`` — date, destination_id, demand
 
     Demand is generated with weekly seasonality (15% reduction on weekends),
     a slow upward trend (~0.15% per day), occasional promotional spikes
     (8% probability, +25% demand), and Gaussian noise.
+
+    Parameters
+    ----------
+    output_dir : Path
+        Directory in which to write the four parquet files.
+    n_origins : int
+        Number of origin warehouses.
+    n_destinations : int
+        Number of destination stores/DCs.
+    start_date : datetime
+        First date in the demand history.
+    end_date : datetime
+        Last date (inclusive) in the demand history.
+    seed : int
+        NumPy random seed for reproducibility. Defaults to ``42``.
+    include_holding_cost : bool
+        When ``True``, adds a ``holding_cost`` column to ``destinations.parquet``
+        with per-destination costs drawn uniformly from ``holding_cost_range``.
+        Defaults to ``False``.
+    holding_cost_range : tuple[float, float]
+        ``(min, max)`` range for per-destination holding costs (only used when
+        ``include_holding_cost=True``). Defaults to ``(0.5, 2.0)``.
     """
     rng = np.random.default_rng(seed)
 
@@ -47,7 +71,17 @@ def generate_synthetic_logistics_data(
         }
     )
 
-    destinations = pl.DataFrame({"destination_id": destination_ids})
+    if include_holding_cost:
+        lo, hi = holding_cost_range
+        holding_costs = [round(float(rng.uniform(lo, hi)), 2) for _ in destination_ids]
+        destinations = pl.DataFrame(
+            {
+                "destination_id": destination_ids,
+                "holding_cost": holding_costs,
+            }
+        )
+    else:
+        destinations = pl.DataFrame({"destination_id": destination_ids})
 
     lanes = pl.DataFrame(
         [
@@ -120,5 +154,46 @@ def _synthetic2() -> None:
     )
 
 
+def _experiment_synthetic_v1() -> None:
+    """Regenerate experiments/datasets/synthetic_v1 with holding costs.
+
+    Same random seed and size as the original synthetic_v1 (3 origins,
+    6 destinations, 2025-01-01 to 2025-06-30, seed=42), but now includes
+    a ``holding_cost`` column in destinations.parquet so the LP cost
+    breakdown is non-degenerate in experiment results.
+    """
+    generate_synthetic_logistics_data(
+        output_dir=_PROJECT_ROOT / "experiments" / "datasets" / "synthetic_v1",
+        n_origins=3,
+        n_destinations=6,
+        start_date=datetime(2025, 1, 1),
+        end_date=datetime(2025, 6, 30),
+        seed=42,
+        include_holding_cost=True,
+        holding_cost_range=(0.5, 2.0),
+    )
+
+
+def _experiment_synthetic_v2() -> None:
+    """Generate experiments/datasets/synthetic_v2 — a larger scale dataset.
+
+    20 destinations across 10 origins with a full year of daily history (365 days).
+    Used to validate that the pipeline scales beyond the 6-destination toy example.
+    10 origins (daily_capacity 80–180 each, ~1 300 total/day) comfortably covers
+    20 destinations with base demands drawn from [20, 70] (~900 units/day mean).
+    """
+    generate_synthetic_logistics_data(
+        output_dir=_PROJECT_ROOT / "experiments" / "datasets" / "synthetic_v2",
+        n_origins=10,
+        n_destinations=20,
+        start_date=datetime(2025, 1, 1),
+        end_date=datetime(2025, 12, 31),
+        seed=7,
+        include_holding_cost=True,
+        holding_cost_range=(0.5, 2.0),
+    )
+
+
 if __name__ == "__main__":
-    _synthetic2()
+    _experiment_synthetic_v1()
+    _experiment_synthetic_v2()
