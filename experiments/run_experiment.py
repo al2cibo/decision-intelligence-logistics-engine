@@ -24,6 +24,7 @@ from data.processing.data_processor import DataProcessor
 from forecasting import create_forecasting_pipeline, AggregatedForecastingResult
 from optimization import MultiPeriodOptimizer, MultiPeriodResult
 from experiment_config import ExperimentConfig, load_experiment_config
+from actuals_evaluator import evaluate as evaluate_realized, save_realized_metrics
 from utils.system_paths import get_project_root
 
 logging.basicConfig(
@@ -92,6 +93,15 @@ def run_experiment(config_path: Path) -> None:
     shutil.copy(config_path, config.output_path / "config.yaml")
 
     logger.info("Artifacts saved to: %s", config.output_path)
+
+    # --- Realized evaluation ---
+    realized = evaluate_realized(config.output_path)
+    save_realized_metrics(realized, config.output_path)
+    logger.info(
+        "Realized evaluation: fill_rate=%.4f, realized_cost=%.2f",
+        realized.fill_rate,
+        realized.realized_total_cost,
+    )
 
 
 def _save_metrics(
