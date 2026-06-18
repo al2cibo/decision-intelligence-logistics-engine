@@ -258,6 +258,12 @@ class PerDestinationForecastingPipeline:
                         )
                     )
                     model_metrics.append((model.name, metrics))
+                    logger.info(
+                        "  [%s] %s: WAPE=%.4f",
+                        destination_id,
+                        model.name,
+                        metrics.get("wape", float("nan")),
+                    )
 
                 except Exception as exc:
                     logger.error(
