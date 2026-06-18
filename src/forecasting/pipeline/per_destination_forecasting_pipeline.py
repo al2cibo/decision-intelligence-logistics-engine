@@ -110,7 +110,9 @@ class PerDestinationForecastingPipeline:
         Destinations with fewer rows than this are skipped with a warning.
         Defaults to ``2``.
     random_seed : int
-        Base seed for reproducibility. Each destination gets a derived seed
+        Some of the predictive models may contain stochastic parameters 
+        (e.g. ETS/SARIMAX), hence we fix this seed to maintain results reproducibility. 
+        Each destination gets a derived seed
         ``abs(hash(destination_id)) ^ random_seed`` to ensure determinism
         independent of execution order. Defaults to ``42``.
     model_params : dict | None

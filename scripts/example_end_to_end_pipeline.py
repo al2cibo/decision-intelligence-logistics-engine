@@ -155,7 +155,7 @@ def main():
     if clean_data.demand_history.is_empty():
         raise ValueError("Empty demand history after processing")
 
-    # --- Per-destination forecasting config ---
+    # --- Per-destination forecasting config reading ---
     if config.per_destination_forecasting is None:
         raise ValueError(
             "per_destination_forecasting section is missing from the config file."
