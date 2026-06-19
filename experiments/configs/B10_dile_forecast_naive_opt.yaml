@@ -1,0 +1,24 @@
+experiment_name: B10_dile_forecast_naive_opt
+dataset_path: experiments/datasets/synthetic_v2
+output_path: experiments/results/B10_dile_forecast_naive_opt
+
+forecast_strategy: dile
+optimization_strategy: naive
+test_periods: 30
+
+per_destination_forecasting:
+  model_names:
+    - naive_forecaster
+    - seasonal_forecaster
+    - rolling_window_forecaster
+    - ets_forecaster
+    - sarimax_forecaster
+  train_ratio: 0.9178
+  selection_metric: wape
+  minimum_history_length: 10
+  random_seed: 42
+  model_params:
+    seasonal_forecaster:
+      lag_value: 7
+    rolling_window_forecaster:
+      rolling_window: 7
