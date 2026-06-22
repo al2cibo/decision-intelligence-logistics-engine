@@ -52,8 +52,8 @@ class RealizedMetrics:
 def evaluate(experiment_output_path: Path) -> RealizedMetrics:
     """Simulate the experiment's planned flows against actual demand.
 
-    Reads flows.parquet and metrics.json from experiment_output_path, plus the
-    original dataset referenced in config.yaml, and returns realized metrics.
+    Reads flows.parquet and planning_metrics.json from experiment_output_path,
+    plus the original dataset referenced in config.yaml, and returns realized metrics.
     """
     project_root = get_project_root()
     config = load_experiment_config(

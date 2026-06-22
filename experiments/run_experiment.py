@@ -4,7 +4,8 @@ Usage (from project root):
     PYTHONPATH=src python experiments/run_experiment.py experiments/configs/<name>.yaml
 
 Artifacts written to the config's output_path:
-    metrics.json          — forecast metrics per destination + cost + service level
+    planning_metrics.json — forecast metrics per destination + planned cost (evaluated
+                            against forecasted demand, not actual demand)
     forecasts.parquet     — [destination_id, date, demand] forecast signal used
     flows.parquet         — [origin_id, destination_id, period, flow]
     inventory.parquet     — [destination_id, period, inventory]
@@ -217,7 +218,7 @@ def _save_metrics(
         },
     }
 
-    with open(config.output_path / "metrics.json", "w") as f:
+    with open(config.output_path / "planning_metrics.json", "w") as f:
         json.dump(metrics, f, indent=2)
 
 

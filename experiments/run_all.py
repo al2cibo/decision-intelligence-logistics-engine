@@ -55,44 +55,45 @@ def _print_summary() -> None:
 
     header = (
         f"{'Scenario':<36} {'F':>5} {'O':>5} {'WAPE':>8}"
-        f" {'Planned$':>10} {'Realized$':>10} {'Fill%':>8} {'Unmet%':>8}"
+        f" {'Planned$':>10} {'Realized$':>10} {'Holding$':>10} {'Unmet%':>8}"
     )
     separator = "-" * len(header)
     rows = []
 
     for config_path in CONFIGS:
         experiment_name = config_path.stem
-        metrics_path = results_root / experiment_name / "metrics.json"
+        planning_path = results_root / experiment_name / "planning_metrics.json"
         realized_path = results_root / experiment_name / "realized_metrics.json"
 
-        if not metrics_path.exists():
+        if not planning_path.exists():
             rows.append(
                 (experiment_name, "?", "?", "MISSING", "-", "-", "-", "-")
             )
             continue
 
-        with open(metrics_path) as f:
+        with open(planning_path) as f:
             m = json.load(f)
 
         f_strat = m.get("forecast_strategy", "dile")[0].upper()
         o_strat = m.get("optimization_strategy", "dile")[0].upper()
         agg = m.get("aggregated_forecast", {})
         costs = m.get("costs", {})
-        svc = m.get("service_level", {})
 
         mean_wape = agg.get("mean_wape")
         wape_str = f"{mean_wape:.4f}" if mean_wape is not None else "  N/A"
         planned_cost = costs.get("total_cost", float("nan"))
-        unmet_pct = svc.get("unmet_demand_pct", 0.0)
 
         if realized_path.exists():
             with open(realized_path) as f:
                 r = json.load(f)
             realized_cost = r.get("realized_total_cost", float("nan"))
+            holding_cost = r.get("realized_holding_cost", float("nan"))
             fill_rate = r.get("fill_rate", float("nan"))
+            unmet_pct = (1.0 - fill_rate) * 100
         else:
             realized_cost = float("nan")
-            fill_rate = float("nan")
+            holding_cost = float("nan")
+            unmet_pct = float("nan")
 
         rows.append(
             (
@@ -102,7 +103,7 @@ def _print_summary() -> None:
                 wape_str,
                 f"{planned_cost:.2f}",
                 f"{realized_cost:.2f}",
-                f"{fill_rate * 100:.2f}",
+                f"{holding_cost:.2f}",
                 f"{unmet_pct:.2f}",
             )
         )
@@ -113,7 +114,7 @@ def _print_summary() -> None:
     for row in rows:
         print(
             f"{row[0]:<36} {row[1]:>5} {row[2]:>5} {row[3]:>8}"
-            f" {row[4]:>10} {row[5]:>10} {row[6]:>8} {row[7]:>8}"
+            f" {row[4]:>10} {row[5]:>10} {row[6]:>10} {row[7]:>8}"
         )
     print(separator)
 
