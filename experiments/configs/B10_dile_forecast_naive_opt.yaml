@@ -13,7 +13,7 @@ per_destination_forecasting:
     - rolling_window_forecaster
     - ets_forecaster
     - sarimax_forecaster
-  train_ratio: 0.9178
+  train_ratio: 0.9179
   selection_metric: wape
   minimum_history_length: 10
   random_seed: 42
