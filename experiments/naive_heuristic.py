@@ -94,14 +94,8 @@ def compute_lag1_forecast(
     test_dates = set(all_dates[-test_periods:])
 
     lagged = (
-        demand_history
-        .sort(["destination_id", "date"])
-        .with_columns(
-            pl.col("demand")
-            .shift(1)
-            .over("destination_id")
-            .alias("demand")
-        )
+        demand_history.sort(["destination_id", "date"])
+        .with_columns(pl.col("demand").shift(1).over("destination_id").alias("demand"))
         .filter(pl.col("date").is_in(list(test_dates)))
         .drop_nulls("demand")
     )
@@ -164,11 +158,15 @@ def run_naive_heuristic(
     }
 
     forecast_map: dict[tuple[str, Date], float] = {
-        (r["destination_id"], r["date"]): float(r["demand"]) if r["demand"] is not None else 0.0
+        (r["destination_id"], r["date"]): (
+            float(r["demand"]) if r["demand"] is not None else 0.0
+        )
         for r in forecast_ts.to_dicts()
     }
     actual_map: dict[tuple[str, Date], float] = {
-        (r["destination_id"], r["date"]): float(r["demand"]) if r["demand"] is not None else 0.0
+        (r["destination_id"], r["date"]): (
+            float(r["demand"]) if r["demand"] is not None else 0.0
+        )
         for r in actual_demand_ts.to_dicts()
     }
 
@@ -184,9 +182,7 @@ def run_naive_heuristic(
     inv: dict[str, float] = {d: 0.0 for d in destinations}
 
     for t in test_dates:
-        forecasts_t = {
-            d: max(0.0, forecast_map.get((d, t), 0.0)) for d in destinations
-        }
+        forecasts_t = {d: max(0.0, forecast_map.get((d, t), 0.0)) for d in destinations}
         total_forecast_t = sum(forecasts_t.values())
 
         if total_forecast_t > 0.0:

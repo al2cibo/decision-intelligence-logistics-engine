@@ -105,7 +105,9 @@ def load_experiment_config(project_root: Path, config_path: Path) -> ExperimentC
 
     test_periods_raw = raw.get("test_periods", 30)
     if not isinstance(test_periods_raw, int) or test_periods_raw < 1:
-        raise ValueError(f"test_periods must be a positive integer, got {test_periods_raw!r}.")
+        raise ValueError(
+            f"test_periods must be a positive integer, got {test_periods_raw!r}."
+        )
     test_periods = test_periods_raw
 
     forecasting: Optional[PerDestinationConfig] = None

@@ -66,9 +66,7 @@ def _print_summary() -> None:
         realized_path = results_root / experiment_name / "realized_metrics.json"
 
         if not planning_path.exists():
-            rows.append(
-                (experiment_name, "?", "?", "MISSING", "-", "-", "-", "-")
-            )
+            rows.append((experiment_name, "?", "?", "MISSING", "-", "-", "-", "-"))
             continue
 
         with open(planning_path) as f:
@@ -142,7 +140,9 @@ def _print_cost_decomposition(results_root: Path) -> None:
     print(f"    Optimization impact  (B00 - B01): {b00 - b01:+.2f}")
     print(f"    Forecasting impact   (B00 - B10): {b00 - b10:+.2f}")
     print(f"    Total DILE impact    (B00 - B11): {b00 - b11:+.2f}")
-    print(f"    Interaction effect             : {(b00 - b11) - (b00 - b01) - (b00 - b10):+.2f}\n")
+    print(
+        f"    Interaction effect             : {(b00 - b11) - (b00 - b01) - (b00 - b10):+.2f}\n"
+    )
 
 
 def _print_destination_breakdown(results_root: Path) -> None:

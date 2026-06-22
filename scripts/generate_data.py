@@ -203,7 +203,9 @@ def _experiment_synthetic_v2() -> None:
     start = datetime(2024, 1, 1)
     dates = pl.date_range(
         start=start,
-        end=datetime(2024, 12, 30),  # 2024 is a leap year; end on Dec 30 for exactly 365 days
+        end=datetime(
+            2024, 12, 30
+        ),  # 2024 is a leap year; end on Dec 30 for exactly 365 days
         interval="1d",
         eager=True,
     )
@@ -211,33 +213,51 @@ def _experiment_synthetic_v2() -> None:
     day_of_week = [d.weekday() for d in dates]  # 0=Mon … 6=Sun
 
     # --- origins ---
-    origins = pl.DataFrame({
-        "origin_id": ["O1", "O2", "O3"],
-        "daily_capacity": [300.0, 250.0, 200.0],
-    })
+    origins = pl.DataFrame(
+        {
+            "origin_id": ["O1", "O2", "O3"],
+            "daily_capacity": [300.0, 250.0, 200.0],
+        }
+    )
 
     # --- destinations ---
-    destinations = pl.DataFrame({
-        "destination_id": ["D1", "D2", "D3", "D4", "D5", "D6"],
-        "holding_cost":   [0.50, 0.75, 1.00, 0.40, 0.60, 0.90],
-    })
+    destinations = pl.DataFrame(
+        {
+            "destination_id": ["D1", "D2", "D3", "D4", "D5", "D6"],
+            "holding_cost": [0.50, 0.75, 1.00, 0.40, 0.60, 0.90],
+        }
+    )
 
     # --- lanes (hand-assigned, fully connected 3×6) ---
     lane_costs = {
         # O1: cheapest (2.0–4.0)
-        ("O1", "D1"): 2.0, ("O1", "D2"): 2.5, ("O1", "D3"): 3.0,
-        ("O1", "D4"): 2.2, ("O1", "D5"): 3.5, ("O1", "D6"): 4.0,
+        ("O1", "D1"): 2.0,
+        ("O1", "D2"): 2.5,
+        ("O1", "D3"): 3.0,
+        ("O1", "D4"): 2.2,
+        ("O1", "D5"): 3.5,
+        ("O1", "D6"): 4.0,
         # O2: mid-range (3.5–6.0)
-        ("O2", "D1"): 3.5, ("O2", "D2"): 4.0, ("O2", "D3"): 4.5,
-        ("O2", "D4"): 5.0, ("O2", "D5"): 5.5, ("O2", "D6"): 6.0,
+        ("O2", "D1"): 3.5,
+        ("O2", "D2"): 4.0,
+        ("O2", "D3"): 4.5,
+        ("O2", "D4"): 5.0,
+        ("O2", "D5"): 5.5,
+        ("O2", "D6"): 6.0,
         # O3: most expensive (5.0–8.0)
-        ("O3", "D1"): 5.0, ("O3", "D2"): 5.5, ("O3", "D3"): 6.0,
-        ("O3", "D4"): 6.5, ("O3", "D5"): 7.0, ("O3", "D6"): 8.0,
+        ("O3", "D1"): 5.0,
+        ("O3", "D2"): 5.5,
+        ("O3", "D3"): 6.0,
+        ("O3", "D4"): 6.5,
+        ("O3", "D5"): 7.0,
+        ("O3", "D6"): 8.0,
     }
-    lanes = pl.DataFrame([
-        {"origin_id": o, "destination_id": d, "unit_cost": c}
-        for (o, d), c in lane_costs.items()
-    ])
+    lanes = pl.DataFrame(
+        [
+            {"origin_id": o, "destination_id": d, "unit_cost": c}
+            for (o, d), c in lane_costs.items()
+        ]
+    )
 
     # --- demand history ---
     def seasonal_mult(pattern: list[float]) -> np.ndarray:
@@ -246,33 +266,45 @@ def _experiment_synthetic_v2() -> None:
     t = np.arange(n_days)
 
     # D1: strong weekly seasonality, level ~80, no trend, low noise
-    d1 = 80.0 * seasonal_mult([1.20, 1.15, 1.00, 0.90, 0.85, 0.70, 0.75]) \
-        + np.random.normal(0, 4, n_days)
+    d1 = 80.0 * seasonal_mult(
+        [1.20, 1.15, 1.00, 0.90, 0.85, 0.70, 0.75]
+    ) + np.random.normal(0, 4, n_days)
 
     # D2: flat, no seasonality, level ~60, low noise
     d2 = 60.0 + np.random.normal(0, 3, n_days)
 
     # D3: upward trend, weak seasonality, level ~50, moderate noise
-    d3 = (50.0 + 0.1 * t) * seasonal_mult([1.05, 1.02, 1.00, 0.98, 0.97, 0.99, 1.00]) \
-        + np.random.normal(0, 7, n_days)
+    d3 = (50.0 + 0.1 * t) * seasonal_mult(
+        [1.05, 1.02, 1.00, 0.98, 0.97, 0.99, 1.00]
+    ) + np.random.normal(0, 7, n_days)
 
     # D4: strong weekly seasonality + upward trend, level ~90, moderate noise
-    d4 = (90.0 + 0.08 * t) * seasonal_mult([1.25, 1.20, 1.05, 0.95, 0.85, 0.70, 0.80]) \
-        + np.random.normal(0, 8, n_days)
+    d4 = (90.0 + 0.08 * t) * seasonal_mult(
+        [1.25, 1.20, 1.05, 0.95, 0.85, 0.70, 0.80]
+    ) + np.random.normal(0, 8, n_days)
 
     # D5: high noise, no pattern, level ~70
     d5 = 70.0 + np.random.normal(0, 20, n_days)
 
     # D6: weekly seasonality + mild downward trend, level ~100, low noise
-    d6 = (100.0 - 0.05 * t) * seasonal_mult([1.10, 1.05, 1.00, 0.95, 0.90, 0.95, 1.00]) \
-        + np.random.normal(0, 5, n_days)
+    d6 = (100.0 - 0.05 * t) * seasonal_mult(
+        [1.10, 1.05, 1.00, 0.95, 0.90, 0.95, 1.00]
+    ) + np.random.normal(0, 5, n_days)
 
     demand_rows = []
-    for dest_id, raw in [("D1", d1), ("D2", d2), ("D3", d3),
-                          ("D4", d4), ("D5", d5), ("D6", d6)]:
+    for dest_id, raw in [
+        ("D1", d1),
+        ("D2", d2),
+        ("D3", d3),
+        ("D4", d4),
+        ("D5", d5),
+        ("D6", d6),
+    ]:
         clipped = np.clip(raw, 0, None).round(1)
         for date, val in zip(dates, clipped):
-            demand_rows.append({"date": date, "destination_id": dest_id, "demand": float(val)})
+            demand_rows.append(
+                {"date": date, "destination_id": dest_id, "demand": float(val)}
+            )
 
     demand_history = pl.DataFrame(demand_rows).with_columns(
         pl.col("date").cast(pl.Date)
@@ -304,14 +336,15 @@ def _experiment_synthetic_v2() -> None:
         print(f"  {row['destination_id']}: {row['holding_cost']}")
     print("\nDemand statistics per destination:")
     stats = (
-        demand_history
-        .group_by("destination_id")
-        .agg([
-            pl.col("demand").mean().round(2).alias("mean"),
-            pl.col("demand").std().round(2).alias("std"),
-            pl.col("demand").min().round(2).alias("min"),
-            pl.col("demand").max().round(2).alias("max"),
-        ])
+        demand_history.group_by("destination_id")
+        .agg(
+            [
+                pl.col("demand").mean().round(2).alias("mean"),
+                pl.col("demand").std().round(2).alias("std"),
+                pl.col("demand").min().round(2).alias("min"),
+                pl.col("demand").max().round(2).alias("max"),
+            ]
+        )
         .sort("destination_id")
     )
     print(stats)

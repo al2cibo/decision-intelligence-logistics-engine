@@ -160,9 +160,15 @@ def evaluate(experiment_output_path: Path) -> RealizedMetrics:
 
     transport_cost = sum(dest_transport_cost.values())
     realized_total_cost = transport_cost + realized_holding_cost
-    fill_rate = total_fulfilled / total_actual_demand if total_actual_demand > 0 else 1.0
-    cpu_demanded = realized_total_cost / total_actual_demand if total_actual_demand > 0 else 0.0
-    cpu_fulfilled = realized_total_cost / total_fulfilled if total_fulfilled > 0 else 0.0
+    fill_rate = (
+        total_fulfilled / total_actual_demand if total_actual_demand > 0 else 1.0
+    )
+    cpu_demanded = (
+        realized_total_cost / total_actual_demand if total_actual_demand > 0 else 0.0
+    )
+    cpu_fulfilled = (
+        realized_total_cost / total_fulfilled if total_fulfilled > 0 else 0.0
+    )
 
     return RealizedMetrics(
         transport_cost=transport_cost,
