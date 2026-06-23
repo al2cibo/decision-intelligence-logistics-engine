@@ -21,6 +21,7 @@ from data.ingestion import Reader
 from data.processing.data_processor import DataProcessor
 
 from forecasting import create_forecasting_pipeline, AggregatedForecastingResult
+from forecasting.config import PerDestinationConfig
 
 from optimization import MultiPeriodOptimizer, MultiPeriodResult
 
