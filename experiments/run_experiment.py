@@ -26,8 +26,6 @@ import shutil
 from pathlib import Path
 from typing import Optional
 
-import polars as pl
-
 from data.ingestion import Reader
 from data.processing.data_processor import DataProcessor
 from forecasting import create_forecasting_pipeline, AggregatedForecastingResult
@@ -109,13 +107,9 @@ def run_experiment(config_path: Path) -> None:
 
     if config.optimization_strategy == "naive":
         logger.info("Optimization strategy: naive (proportional capacity heuristic)")
-        test_dates = sorted(demand_ts["date"].unique().to_list())
-        actual_demand_ts = clean_data.demand_history.filter(
-            pl.col("date").is_in(test_dates)
-        )
         heuristic = run_naive_heuristic(
             forecast_ts=demand_ts,
-            actual_demand_ts=actual_demand_ts,
+            demand_history=clean_data.demand_history,
             origins_df=clean_data.origins,
             lanes_df=clean_data.lanes,
             destinations_df=clean_data.destinations,
@@ -153,7 +147,7 @@ def run_experiment(config_path: Path) -> None:
     logger.info("Artifacts saved to: %s", config.output_path)
 
     # --- Realized evaluation (retroactive against actual demand) ---
-    realized = evaluate_realized(config.output_path)
+    realized = evaluate_realized(result.flows, raw_data)
     save_realized_metrics(realized, config.output_path)
     logger.info(
         "Realized evaluation: fill_rate=%.4f, realized_cost=%.2f",

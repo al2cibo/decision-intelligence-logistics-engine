@@ -102,9 +102,17 @@ def compute_lag1_forecast(
     return lagged.select(["destination_id", "date", "demand"])
 
 
+def _ts_to_map(df: pl.DataFrame) -> dict[tuple, float]:
+    """Convert a [destination_id, date, demand] DataFrame to a (dest, date)->demand dict."""
+    return {
+        (r["destination_id"], r["date"]): float(r["demand"])
+        for r in df.with_columns(pl.col("demand").fill_null(0.0)).to_dicts()
+    }
+
+
 def run_naive_heuristic(
     forecast_ts: pl.DataFrame,
-    actual_demand_ts: pl.DataFrame,
+    demand_history: pl.DataFrame,
     origins_df: pl.DataFrame,
     lanes_df: pl.DataFrame,
     destinations_df: pl.DataFrame,
@@ -131,8 +139,9 @@ def run_naive_heuristic(
         Demand signal for the test window ``[destination_id, date, demand]``.
         For F0 scenarios this comes from ``compute_lag1_forecast``; for F1
         scenarios it comes from ``AggregatedForecastingResult.export_forecasts()``.
-    actual_demand_ts : pl.DataFrame
-        Ground-truth demand for the same test window ``[destination_id, date, demand]``.
+    demand_history : pl.DataFrame
+        Full demand history ``[date, destination_id, demand]``. Rows outside
+        the test window derived from ``forecast_ts`` are ignored.
     origins_df : pl.DataFrame
         ``[origin_id, daily_capacity]``.
     lanes_df : pl.DataFrame
@@ -149,6 +158,8 @@ def run_naive_heuristic(
     origins: list[str] = sorted(origins_df["origin_id"].unique().to_list())
     destinations: list[str] = sorted(forecast_ts["destination_id"].unique().to_list())
 
+    actual_demand_ts = demand_history.filter(pl.col("date").is_in(test_dates))
+
     capacity_map: dict[str, float] = dict(
         zip(origins_df["origin_id"].to_list(), origins_df["daily_capacity"].to_list())
     )
@@ -157,18 +168,8 @@ def run_naive_heuristic(
         for r in lanes_df.to_dicts()
     }
 
-    forecast_map: dict[tuple[str, Date], float] = {
-        (r["destination_id"], r["date"]): (
-            float(r["demand"]) if r["demand"] is not None else 0.0
-        )
-        for r in forecast_ts.to_dicts()
-    }
-    actual_map: dict[tuple[str, Date], float] = {
-        (r["destination_id"], r["date"]): (
-            float(r["demand"]) if r["demand"] is not None else 0.0
-        )
-        for r in actual_demand_ts.to_dicts()
-    }
+    forecast_map = _ts_to_map(forecast_ts)
+    actual_map = _ts_to_map(actual_demand_ts)
 
     flow_rows: list[dict] = []
     inventory_rows: list[dict] = []

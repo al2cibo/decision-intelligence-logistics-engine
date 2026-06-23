@@ -46,6 +46,16 @@ class ExperimentConfig:
     test_periods: int = 30
     forecasting: Optional[PerDestinationConfig] = field(default=None)
 
+    def __post_init__(self) -> None:
+        if self.forecast_strategy == "dile" and self.forecasting is None:
+            raise ValueError(
+                "forecasting config is required when forecast_strategy is 'dile'."
+            )
+        if self.forecast_strategy != "dile" and self.forecasting is not None:
+            raise ValueError(
+                "forecasting config must be None when forecast_strategy is not 'dile'."
+            )
+
 
 def load_experiment_config(project_root: Path, config_path: Path) -> ExperimentConfig:
     """Load and validate an experiment configuration from a YAML file.
@@ -103,12 +113,11 @@ def load_experiment_config(project_root: Path, config_path: Path) -> ExperimentC
             f"got '{optimization_strategy}'."
         )
 
-    test_periods_raw = raw.get("test_periods", 30)
-    if not isinstance(test_periods_raw, int) or test_periods_raw < 1:
+    test_periods = raw.get("test_periods", 30)
+    if not isinstance(test_periods, int) or test_periods < 1:
         raise ValueError(
-            f"test_periods must be a positive integer, got {test_periods_raw!r}."
+            f"test_periods must be a positive integer, got {test_periods!r}."
         )
-    test_periods = test_periods_raw
 
     forecasting: Optional[PerDestinationConfig] = None
     if forecast_strategy == "dile":
