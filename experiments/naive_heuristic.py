@@ -110,7 +110,7 @@ def _ts_to_map(df: pl.DataFrame) -> dict[tuple, float]:
     }
 
 
-def run_naive_heuristic(
+def run_naive_allocation_heuristic(
     forecast_ts: pl.DataFrame,
     demand_history: pl.DataFrame,
     origins_df: pl.DataFrame,

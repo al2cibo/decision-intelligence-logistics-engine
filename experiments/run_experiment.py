@@ -34,7 +34,7 @@ from experiment_config import ExperimentConfig, load_experiment_config
 from naive_heuristic import (
     HeuristicResult,
     compute_lag1_forecast,
-    run_naive_heuristic,
+    run_naive_allocation_heuristic,
 )
 from actuals_evaluator import evaluate as evaluate_realized, save_realized_metrics
 from utils.system_paths import get_project_root
@@ -107,7 +107,7 @@ def run_experiment(config_path: Path) -> None:
 
     if config.optimization_strategy == "naive":
         logger.info("Optimization strategy: naive (proportional capacity heuristic)")
-        heuristic = run_naive_heuristic(
+        heuristic = run_naive_allocation_heuristic(
             forecast_ts=demand_ts,
             demand_history=clean_data.demand_history,
             origins_df=clean_data.origins,
