@@ -4,7 +4,6 @@ Supports configurable ARIMA order (p, d, q) and optional seasonal order (P, D, Q
 When ``seasonal_order`` is None the model reduces to a plain ARIMA.
 """
 
-import numpy as np
 import polars as pl
 from statsmodels.tsa.statespace.sarimax import SARIMAX
 
@@ -14,9 +13,11 @@ from forecasting.models.base_forecaster import BaseForecaster
 class SARIMAXForecaster(BaseForecaster):
     """ARIMA/SARIMA forecaster built on statsmodels SARIMAX.
 
-    Fits on the training series and produces in-sample fitted values for the
-    test window. If the test window extends beyond the training length, the
-    model appends out-of-sample forecasts.
+    Fits on the training series and produces genuine out-of-sample forecasts
+    for whatever window is passed to ``predict`` — the pipeline always calls
+    ``predict`` on data chronologically after the training window, so the
+    forecast is always ``forecast(steps=len(df))`` starting right after the
+    end of training.
 
     Parameters
     ----------
@@ -40,7 +41,6 @@ class SARIMAXForecaster(BaseForecaster):
         self.seasonal_order = seasonal_order
         self.forecast_col = "sarimax_forecast"
         self._fitted_result = None
-        self._train_length = 0
 
     @property
     def name(self) -> str:
@@ -51,7 +51,6 @@ class SARIMAXForecaster(BaseForecaster):
             raise ValueError(f"Column '{self.target_col}' not found in DataFrame")
 
         y = df[self.target_col].to_numpy().astype(float)
-        self._train_length = len(y)
 
         model = SARIMAX(
             y,
@@ -69,14 +68,7 @@ class SARIMAXForecaster(BaseForecaster):
             raise ValueError(f"Column '{self.target_col}' not found in DataFrame")
 
         n = len(df)
-        fitted_vals = self._fitted_result.fittedvalues
-
-        if n <= self._train_length:
-            forecast_values = fitted_vals[:n]
-        else:
-            oos_steps = n - self._train_length
-            oos_forecast = self._fitted_result.forecast(steps=oos_steps)
-            forecast_values = np.concatenate([fitted_vals, oos_forecast])
+        forecast_values = self._fitted_result.forecast(steps=n)
 
         return df.with_columns(
             pl.Series(name=self.forecast_col, values=forecast_values)
