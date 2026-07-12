@@ -69,10 +69,16 @@ src/
   optimization/   # LP formulation and OR-Tools solver
   simulation/     # Stochastic scenario generation
   utils/          # Shared helpers
+experiments/      # 2x2 factorial experiment infra: configs, runners (run_experiment.py,
+                  # run_all.py), naive baseline heuristic, realized-cost evaluator,
+                  # versioned datasets (datasets/synthetic_v1, synthetic_v2)
 tests/
-  forecaster/     # Unit tests for individual forecasters
-  forecasting/    # Integration tests for the forecasting pipeline
+  data/           # Tests for data ingestion/processing
+  forecasting/    # Unit + integration tests for the forecasting pipeline
+                  # (mirrors src/forecasting/'s module layout: models/, evaluation/,
+                  # pipeline/, registry/, results/)
   optimization/   # Tests for the optimization module
+  experiments/    # Tests for the experiments module (naive heuristic, etc.)
   utils/          # Tests for shared utilities
 scripts/          # Runnable end-to-end examples
 configs/          # YAML configuration files
@@ -107,6 +113,26 @@ python -m pytest tests/optimization/ -v
 - All existing tests pass.
 - New behaviour is covered by at least one test.
 - Property-based tests (if any) are not flaky — run them a couple of times if unsure.
+
+---
+
+## Running Experiments
+
+The `experiments/` module runs the 2×2 factorial design (naive vs. DILE forecasting ×
+naive vs. DILE optimization) against the versioned `experiments/datasets/synthetic_v2/`
+dataset. `PYTHONPATH=src` is required since these scripts import from `src/` directly:
+
+```bash
+# Run all four scenarios (B00, B01, B10, B11) and print a consolidated summary
+PYTHONPATH=src python experiments/run_all.py
+
+# Run a single scenario
+PYTHONPATH=src python experiments/run_experiment.py experiments/configs/B11_dile_forecast_dile_opt.yaml
+```
+
+Do not overwrite `experiments/datasets/synthetic_v1/` or `synthetic_v2/` — they are
+versioned fixtures for reproducible results; regenerate only via
+`scripts/generate_data.py` if you specifically intend to change the paper dataset.
 
 ---
 
