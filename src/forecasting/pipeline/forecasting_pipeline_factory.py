@@ -56,4 +56,6 @@ def create_forecasting_pipeline(
         minimum_history_length=config.minimum_history_length,
         random_seed=config.random_seed,
         model_params=config.model_params,
+        validation_periods=config.validation_periods,
+        test_periods=config.test_periods,
     )

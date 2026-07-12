@@ -1,0 +1,25 @@
+experiment_name: B11_dile_forecast_dile_opt
+dataset_path: experiments/datasets/synthetic_v2
+output_path: experiments/results/B11_dile_forecast_dile_opt
+
+forecast_strategy: dile
+optimization_strategy: dile
+test_periods: 30
+
+per_destination_forecasting:
+  model_names:
+    - naive_forecaster
+    - seasonal_forecaster
+    - rolling_window_forecaster
+    - ets_forecaster
+    - sarimax_forecaster
+  validation_periods: 30
+  test_periods: 30
+  selection_metric: wape
+  minimum_history_length: 10
+  random_seed: 42
+  model_params:
+    seasonal_forecaster:
+      lag_value: 7
+    rolling_window_forecaster:
+      rolling_window: 7

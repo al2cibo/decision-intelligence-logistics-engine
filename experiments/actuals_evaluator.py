@@ -5,9 +5,14 @@ relative to what actually happens.  This module simulates the planned flows
 against ground-truth demand to produce realized (as-executed) metrics,
 both in aggregate and broken down per destination.
 
-Usage:
+Usage (inline, from run_experiment):
     from actuals_evaluator import evaluate, save_realized_metrics
-    metrics = evaluate(output_path)
+    metrics = evaluate(result.flows, raw_data)
+    save_realized_metrics(metrics, output_path)
+
+Usage (standalone, post-hoc re-evaluation from a results directory):
+    from actuals_evaluator import evaluate_from_path, save_realized_metrics
+    metrics = evaluate_from_path(output_path)
     save_realized_metrics(metrics, output_path)
 """
 
@@ -18,6 +23,7 @@ from pathlib import Path
 import polars as pl
 
 from data.ingestion import Reader
+from data.input_data import InputData
 from experiment_config import load_experiment_config
 from utils.system_paths import get_project_root
 
@@ -49,21 +55,16 @@ class RealizedMetrics:
     per_destination: dict[str, DestinationActuals]
 
 
-def evaluate(experiment_output_path: Path) -> RealizedMetrics:
-    """Simulate the experiment's planned flows against actual demand.
+def evaluate(flows: pl.DataFrame, raw: InputData) -> RealizedMetrics:
+    """Simulate planned flows against actual demand and return realized metrics.
 
-    Reads flows.parquet and metrics.json from experiment_output_path, plus the
-    original dataset referenced in config.yaml, and returns realized metrics.
+    Parameters
+    ----------
+    flows : pl.DataFrame
+        Planned flows ``[origin_id, destination_id, period, flow]``.
+    raw : InputData
+        Raw dataset (destinations, lanes, demand_history).
     """
-    project_root = get_project_root()
-    config = load_experiment_config(
-        project_root, experiment_output_path / "config.yaml"
-    )
-
-    flows = pl.read_parquet(experiment_output_path / "flows.parquet")
-
-    raw = Reader(config.dataset_path).read()
-
     holding_cost_map: dict[str, float] = {}
     if "holding_cost" in raw.destinations.columns:
         holding_cost_map = dict(
@@ -73,22 +74,30 @@ def evaluate(experiment_output_path: Path) -> RealizedMetrics:
             )
         )
 
-    # Per-destination transport cost from planned flows × lane unit costs
-    lane_cost_map: dict[tuple, float] = {
-        (row["origin_id"], row["destination_id"]): row["unit_cost"]
-        for row in raw.lanes.to_dicts()
-    }
-    dest_transport_cost: dict[str, float] = {}
-    for row in flows.to_dicts():
-        d_id = row["destination_id"]
-        cost = lane_cost_map.get((row["origin_id"], d_id), 0.0) * row["flow"]
-        dest_transport_cost[d_id] = dest_transport_cost.get(d_id, 0.0) + cost
+    # Per-destination transport cost: join flows with lanes, multiply, aggregate.
+    transport_by_dest_df = (
+        flows.join(
+            raw.lanes.select(["origin_id", "destination_id", "unit_cost"]),
+            on=["origin_id", "destination_id"],
+            how="left",
+        )
+        .with_columns(
+            (pl.col("flow") * pl.col("unit_cost").fill_null(0.0)).alias("cost")
+        )
+        .group_by("destination_id")
+        .agg(pl.col("cost").sum())
+    )
+    dest_transport_cost: dict[str, float] = dict(
+        zip(
+            transport_by_dest_df["destination_id"].to_list(),
+            transport_by_dest_df["cost"].to_list(),
+        )
+    )
 
     forecast_dates = sorted(flows["period"].unique().to_list())
-
     actual_demand = raw.demand_history.filter(pl.col("date").is_in(forecast_dates))
 
-    # Aggregate planned inflows per (destination, period)
+    # Aggregate planned inflows per (destination, period).
     inflows = (
         flows.group_by(["destination_id", "period"])
         .agg(pl.col("flow").sum().alias("inflow"))
@@ -96,6 +105,19 @@ def evaluate(experiment_output_path: Path) -> RealizedMetrics:
     )
 
     destinations = sorted(raw.destinations["destination_id"].to_list())
+
+    # Pre-partition both DataFrames to avoid O(destinations × rows) repeated scans.
+    inflow_by_dest: dict[str, dict] = {}
+    for row in inflows.to_dicts():
+        inflow_by_dest.setdefault(row["destination_id"], {})[row["date"]] = row[
+            "inflow"
+        ]
+
+    demand_by_dest: dict[str, dict] = {}
+    for row in actual_demand.to_dicts():
+        demand_by_dest.setdefault(row["destination_id"], {})[row["date"]] = row[
+            "demand"
+        ]
 
     total_actual_demand = 0.0
     total_fulfilled = 0.0
@@ -105,15 +127,8 @@ def evaluate(experiment_output_path: Path) -> RealizedMetrics:
 
     for d_id in destinations:
         h_cost = holding_cost_map.get(d_id, 0.0)
-
-        inflow_map: dict = {
-            row["date"]: row["inflow"]
-            for row in inflows.filter(pl.col("destination_id") == d_id).to_dicts()
-        }
-        demand_map: dict = {
-            row["date"]: row["demand"]
-            for row in actual_demand.filter(pl.col("destination_id") == d_id).to_dicts()
-        }
+        inflow_map = inflow_by_dest.get(d_id, {})
+        demand_map = demand_by_dest.get(d_id, {})
 
         d_fulfilled = 0.0
         d_shortage = 0.0
@@ -160,9 +175,15 @@ def evaluate(experiment_output_path: Path) -> RealizedMetrics:
 
     transport_cost = sum(dest_transport_cost.values())
     realized_total_cost = transport_cost + realized_holding_cost
-    fill_rate = total_fulfilled / total_actual_demand if total_actual_demand > 0 else 1.0
-    cpu_demanded = realized_total_cost / total_actual_demand if total_actual_demand > 0 else 0.0
-    cpu_fulfilled = realized_total_cost / total_fulfilled if total_fulfilled > 0 else 0.0
+    fill_rate = (
+        total_fulfilled / total_actual_demand if total_actual_demand > 0 else 1.0
+    )
+    cpu_demanded = (
+        realized_total_cost / total_actual_demand if total_actual_demand > 0 else 0.0
+    )
+    cpu_fulfilled = (
+        realized_total_cost / total_fulfilled if total_fulfilled > 0 else 0.0
+    )
 
     return RealizedMetrics(
         transport_cost=transport_cost,
@@ -176,6 +197,23 @@ def evaluate(experiment_output_path: Path) -> RealizedMetrics:
         cost_per_unit_fulfilled=cpu_fulfilled,
         per_destination=per_destination,
     )
+
+
+def evaluate_from_path(experiment_output_path: Path) -> RealizedMetrics:
+    """Standalone wrapper: re-evaluate an experiment from its saved artifacts.
+
+    Reads flows.parquet and config.yaml from ``experiment_output_path``,
+    re-loads the original dataset, and delegates to ``evaluate()``.
+    Use this for post-hoc re-evaluation; call ``evaluate()`` directly when
+    the flows and dataset are already in memory.
+    """
+    project_root = get_project_root()
+    config = load_experiment_config(
+        project_root, experiment_output_path / "config.yaml"
+    )
+    flows = pl.read_parquet(experiment_output_path / "flows.parquet")
+    raw = Reader(config.dataset_path).read()
+    return evaluate(flows, raw)
 
 
 def save_realized_metrics(metrics: RealizedMetrics, output_path: Path) -> None:

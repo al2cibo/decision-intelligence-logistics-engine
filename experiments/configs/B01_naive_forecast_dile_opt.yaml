@@ -1,0 +1,7 @@
+experiment_name: B01_naive_forecast_dile_opt
+dataset_path: experiments/datasets/synthetic_v2
+output_path: experiments/results/B01_naive_forecast_dile_opt
+
+forecast_strategy: naive
+optimization_strategy: dile
+test_periods: 30

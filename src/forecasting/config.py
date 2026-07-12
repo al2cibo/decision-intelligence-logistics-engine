@@ -8,7 +8,25 @@ KNOWN_METRICS = {"mae", "mse", "rmse", "mape", "wape"}
 
 @dataclass
 class PerDestinationConfig:
-    """Configuration for the per-destination forecasting pipeline."""
+    """Configuration for the per-destination forecasting pipeline.
+
+    Two split modes are supported:
+
+    **Two-way** (default): ``train_ratio`` controls the fraction of rows used
+    for training; the remainder is both the evaluation window and the forecast
+    export window.
+
+    **Three-way** (recommended for experiments): when both ``test_periods``
+    and ``validation_periods`` are set, the dataset is split as::
+
+        [train] [validation] [holdout/test]
+        ← n - hp - vp →  ← vp →  ← hp →
+
+    Model selection uses the validation WAPE.  The winner is re-fitted on
+    train+validation before predicting the holdout, so the exported forecasts
+    and reported WAPE are genuinely out-of-sample.  ``train_ratio`` is ignored
+    in this mode.
+    """
 
     model_names: list[str]
     train_ratio: float = 0.8
@@ -17,6 +35,8 @@ class PerDestinationConfig:
     minimum_history_length: int = 2
     random_seed: int = 42
     model_params: dict[str, dict[str, Any]] = field(default_factory=dict)
+    validation_periods: int | None = None
+    test_periods: int | None = None
 
 
 def _validate_per_destination_config(raw: dict[str, Any]) -> PerDestinationConfig:
@@ -124,6 +144,31 @@ def _validate_per_destination_config(raw: dict[str, Any]) -> PerDestinationConfi
                 f"got {type(model_params[key]).__name__}."
             )
 
+    # --- validation_periods / test_periods (optional three-way split) ---
+    validation_periods = raw.get("validation_periods", None)
+    test_periods = raw.get("test_periods", None)
+
+    for name, val in [
+        ("validation_periods", validation_periods),
+        ("test_periods", test_periods),
+    ]:
+        if val is not None:
+            if not isinstance(val, int):
+                raise ValueError(
+                    f"per_destination_forecasting.{name} must be an integer, "
+                    f"got {type(val).__name__}."
+                )
+            if val < 1:
+                raise ValueError(
+                    f"per_destination_forecasting.{name} must be >= 1, got {val}."
+                )
+
+    if (validation_periods is None) != (test_periods is None):
+        raise ValueError(
+            "per_destination_forecasting.validation_periods and test_periods "
+            "must both be set or both be absent."
+        )
+
     return PerDestinationConfig(
         model_names=model_names,
         train_ratio=train_ratio,
@@ -132,4 +177,6 @@ def _validate_per_destination_config(raw: dict[str, Any]) -> PerDestinationConfi
         minimum_history_length=minimum_history_length,
         random_seed=random_seed,
         model_params=model_params,
+        validation_periods=validation_periods,
+        test_periods=test_periods,
     )

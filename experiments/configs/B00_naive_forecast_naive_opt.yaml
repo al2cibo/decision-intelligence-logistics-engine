@@ -1,0 +1,7 @@
+experiment_name: B00_naive_forecast_naive_opt
+dataset_path: experiments/datasets/synthetic_v2
+output_path: experiments/results/B00_naive_forecast_naive_opt
+
+forecast_strategy: naive
+optimization_strategy: naive
+test_periods: 30

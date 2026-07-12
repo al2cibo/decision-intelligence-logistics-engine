@@ -26,12 +26,20 @@ class NaiveForecaster(BaseForecaster):
         return "naive_forecaster"
 
     def fit(self, df: pl.DataFrame) -> None:
-        """No-op: naive forecasting requires no training."""
+        """Store the last training row for use as context in predict."""
+        if self.target_col not in df.columns:
+            raise ValueError(f"Column '{self.target_col}' not found in DataFrame")
+        self._tail = df.tail(1)
 
     def predict(self, df: pl.DataFrame) -> pl.DataFrame:
         """Return df with a forecast column equal to the lagged demand (shift by 1)."""
         if self.target_col not in df.columns:
             raise ValueError(f"Column '{self.target_col}' not found in DataFrame")
-        return df.with_columns(
+        if not hasattr(self, "_tail"):
+            raise RuntimeError(
+                f"{self.__class__.__name__}.predict() called before fit()"
+            )
+        combined = pl.concat([self._tail, df])
+        return combined.with_columns(
             pl.col(self.target_col).shift(1).alias(self.forecast_col)
-        )
+        ).tail(len(df))

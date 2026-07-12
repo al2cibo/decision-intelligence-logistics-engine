@@ -1,7 +1,11 @@
-"""Run all four experiments in sequence and print a summary table.
+"""Run all 2×2 paper experiments in sequence and print a summary table.
 
 Usage (from any directory):
     PYTHONPATH=<project_root>/src python experiments/run_all.py
+
+Runs B00 → B01 → B10 → B11 in order and prints a consolidated summary table
+covering forecast quality (WAPE), planned cost, realized cost, fill rate,
+and unmet demand percentage.
 """
 
 import json
@@ -19,9 +23,10 @@ logger = logging.getLogger(__name__)
 _HERE = Path(__file__).resolve().parent
 
 CONFIGS = [
-    _HERE / "configs" / "baseline_naive.yaml",
-    _HERE / "configs" / "baseline_global_ets.yaml",
-    _HERE / "configs" / "model_selection.yaml",
+    _HERE / "configs" / "B00_naive_forecast_naive_opt.yaml",
+    _HERE / "configs" / "B01_naive_forecast_dile_opt.yaml",
+    _HERE / "configs" / "B10_dile_forecast_naive_opt.yaml",
+    _HERE / "configs" / "B11_dile_forecast_dile_opt.yaml",
 ]
 
 
@@ -45,81 +50,122 @@ def main() -> None:
         raise SystemExit(1)
 
 
+def _load_results(results_root: Path) -> tuple[dict[str, dict], dict[str, dict]]:
+    """Load planning and realized JSON for each config. Returns (planning, realized) dicts."""
+    planning: dict[str, dict] = {}
+    realized: dict[str, dict] = {}
+    for config_path in CONFIGS:
+        name = config_path.stem
+        p_path = results_root / name / "planning_metrics.json"
+        r_path = results_root / name / "realized_metrics.json"
+        if p_path.exists():
+            with open(p_path) as f:
+                planning[name] = json.load(f)
+        if r_path.exists():
+            with open(r_path) as f:
+                realized[name] = json.load(f)
+    return planning, realized
+
+
 def _print_summary() -> None:
     results_root = _HERE / "results"
+    planning, realized = _load_results(results_root)
+
+    header = (
+        f"{'Scenario':<36} {'F':>5} {'O':>5} {'WAPE':>8}"
+        f" {'Planned$':>10} {'Realized$':>10} {'Holding$':>10} {'Unmet%':>8}"
+    )
+    separator = "-" * len(header)
     rows = []
 
     for config_path in CONFIGS:
         experiment_name = config_path.stem
-        metrics_path = results_root / experiment_name / "metrics.json"
-        realized_path = results_root / experiment_name / "realized_metrics.json"
-
-        if not metrics_path.exists():
-            rows.append((experiment_name, "MISSING", "-", "-", "-", "-", "-"))
+        if experiment_name not in planning:
+            rows.append((experiment_name, "?", "?", "MISSING", "-", "-", "-", "-"))
             continue
 
-        with open(metrics_path) as f:
-            m = json.load(f)
-
+        m = planning[experiment_name]
+        f_strat = m.get("forecast_strategy", "dile")[0].upper()
+        o_strat = m.get("optimization_strategy", "dile")[0].upper()
         agg = m.get("aggregated_forecast", {})
         costs = m.get("costs", {})
+
+        mean_wape = agg.get("mean_wape")
+        wape_str = f"{mean_wape:.4f}" if mean_wape is not None else "  N/A"
         planned_cost = costs.get("total_cost", float("nan"))
 
-        if realized_path.exists():
-            with open(realized_path) as f:
-                r = json.load(f)
+        if experiment_name in realized:
+            r = realized[experiment_name]
             realized_cost = r.get("realized_total_cost", float("nan"))
+            holding_cost = r.get("realized_holding_cost", float("nan"))
             fill_rate = r.get("fill_rate", float("nan"))
+            unmet_pct = (1.0 - fill_rate) * 100
         else:
             realized_cost = float("nan")
-            fill_rate = float("nan")
+            holding_cost = float("nan")
+            unmet_pct = float("nan")
 
         rows.append(
             (
                 experiment_name,
-                "OK",
-                f"{agg.get('mean_wape', float('nan')):.4f}",
+                f_strat,
+                o_strat,
+                wape_str,
                 f"{planned_cost:.2f}",
                 f"{realized_cost:.2f}",
-                f"{fill_rate:.4f}",
+                f"{holding_cost:.2f}",
+                f"{unmet_pct:.2f}",
             )
         )
 
-    header = (
-        f"{'Experiment':<30} {'Status':<8} {'WAPE':>8}"
-        f" {'Planned Cost':>14} {'Realized Cost':>14} {'Fill Rate':>10}"
-    )
-    separator = "-" * len(header)
     print("\n" + separator)
     print(header)
     print(separator)
     for row in rows:
         print(
-            f"{row[0]:<30} {row[1]:<8} {row[2]:>8}"
-            f" {row[3]:>14} {row[4]:>14} {row[5]:>10}"
+            f"{row[0]:<36} {row[1]:>5} {row[2]:>5} {row[3]:>8}"
+            f" {row[4]:>10} {row[5]:>10} {row[6]:>10} {row[7]:>8}"
         )
-    print(separator + "\n")
+    print(separator)
 
-    _print_destination_breakdown(results_root)
+    _print_cost_decomposition(realized)
+    _print_destination_breakdown(realized)
 
 
-def _print_destination_breakdown(results_root: Path) -> None:
+def _print_cost_decomposition(realized: dict[str, dict]) -> None:
+    """Print the 2×2 value decomposition from realized costs."""
+
+    def _cost(name: str) -> float:
+        return realized.get(name, {}).get("realized_total_cost", float("nan"))
+
+    b00 = _cost("B00_naive_forecast_naive_opt")
+    b01 = _cost("B01_naive_forecast_dile_opt")
+    b10 = _cost("B10_dile_forecast_naive_opt")
+    b11 = _cost("B11_dile_forecast_dile_opt")
+
+    print("\n  Value decomposition (realized costs):")
+    print(f"    Optimization impact  (B00 - B01): {b00 - b01:+.2f}")
+    print(f"    Forecasting impact   (B00 - B10): {b00 - b10:+.2f}")
+    print(f"    Total DILE impact    (B00 - B11): {b00 - b11:+.2f}")
+    print(
+        f"    Interaction effect             : {(b00 - b11) - (b00 - b01) - (b00 - b10):+.2f}\n"
+    )
+
+
+def _print_destination_breakdown(realized: dict[str, dict]) -> None:
     dest_header = (
         f"  {'Destination':<14} {'Transport':>12} {'Holding':>10}"
-        f" {'Realized':>12} {'Demand':>10} {'Shortage':>10}"
-        f" {'Fill Rate':>10} {'$/unit dem':>11} {'$/unit ful':>11}"
+        f" {'Realized$':>12} {'Demand':>10} {'Shortage':>10}"
+        f" {'Fill%':>8} {'$/unit':>8}"
     )
     dest_separator = "  " + "-" * (len(dest_header) - 2)
 
     for config_path in CONFIGS:
         experiment_name = config_path.stem
-        realized_path = results_root / experiment_name / "realized_metrics.json"
-        if not realized_path.exists():
+        if experiment_name not in realized:
             continue
 
-        with open(realized_path) as f:
-            r = json.load(f)
-
+        r = realized[experiment_name]
         per_dest = r.get("per_destination", {})
         if not per_dest:
             continue
@@ -137,9 +183,8 @@ def _print_destination_breakdown(results_root: Path) -> None:
                 f" {d['realized_total_cost']:>12.2f}"
                 f" {d['total_actual_demand']:>10.2f}"
                 f" {d['total_shortage']:>10.2f}"
-                f" {d['fill_rate']:>10.4f}"
-                f" {d['cost_per_unit_demanded']:>11.2f}"
-                f" {d['cost_per_unit_fulfilled']:>11.2f}"
+                f" {d['fill_rate'] * 100:>8.2f}"
+                f" {d['cost_per_unit_demanded']:>8.2f}"
             )
         print(dest_separator + "\n")
 
