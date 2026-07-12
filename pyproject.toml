@@ -1,6 +1,6 @@
 [project]
 name = "decision-intelligence-logistics-engine"
-version = "0.1.0"
+version = "1.1.0"
 description = "End-to-end decision intelligence system for logistics optimization"
 authors = [{name="Christian Piermarini"}]
 requires-python = ">=3.11"
