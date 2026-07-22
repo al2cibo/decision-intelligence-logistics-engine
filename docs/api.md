@@ -23,6 +23,11 @@ Open `http://localhost:8000/docs` in your browser. FastAPI generates a full inte
 | `POST` | `/optimize` | Multi-period min-cost flow optimization |
 | `POST` | `/plan` | Full pipeline: forecast → optimize in one call |
 
+Optional `holding_cost` may be supplied on each destination in `/optimize` and
+`/plan`. When present, the multi-period optimizer includes inventory holding cost
+in the objective, and responses expose `transportation_cost` and `holding_cost`
+alongside `total_cost`.
+
 ## Examples
 
 ### `/health`
@@ -71,8 +76,8 @@ curl -X POST http://localhost:8000/plan \
       {"origin_id":"O2","destination_id":"D2","unit_cost":1}
     ],
     "destinations": [
-      {"destination_id":"D1"},
-      {"destination_id":"D2"}
+      {"destination_id":"D1", "holding_cost": 1.0},
+      {"destination_id":"D2", "holding_cost": 0.5}
     ],
     "model_names": ["naive_forecaster"],
     "train_ratio": 0.8,
@@ -123,6 +128,8 @@ Example response:
   },
   "optimization": {
     "total_cost": 230,
+    "transportation_cost": 230,
+    "holding_cost": 0,
     "flows": [
       {
         "origin_id": "O1",

@@ -27,7 +27,7 @@ logger = logging.getLogger(__name__)
 app = FastAPI(
     title="Decision Intelligence Logistics Engine",
     description="Per-destination demand forecasting and multi-period flow optimisation.",
-    version="0.1.0",
+    version="1.1.0",
 )
 
 
@@ -71,7 +71,26 @@ def _to_lanes_df(records) -> pl.DataFrame:
 
 
 def _to_destinations_df(records) -> pl.DataFrame:
-    return pl.DataFrame([r.model_dump() for r in records])
+    """Convert destination records to a DataFrame.
+
+    ``holding_cost`` is included only when at least one destination provides a
+    non-null value. Destinations that omit it default to ``0.0`` so the column
+    stays numeric for the optimizer. When every destination omits holding cost,
+    the column is left out entirely (shipping-cost-only objective).
+    """
+    if any(r.holding_cost is not None for r in records):
+        return pl.DataFrame(
+            [
+                {
+                    "destination_id": r.destination_id,
+                    "holding_cost": (
+                        0.0 if r.holding_cost is None else float(r.holding_cost)
+                    ),
+                }
+                for r in records
+            ]
+        )
+    return pl.DataFrame([{"destination_id": r.destination_id} for r in records])
 
 
 def _build_forecast_response(result) -> ForecastResponse:
@@ -135,6 +154,8 @@ def _build_optimize_response(result) -> OptimizeResponse:
     ]
     return OptimizeResponse(
         total_cost=result.total_cost,
+        transportation_cost=result.transportation_cost,
+        holding_cost=result.holding_cost,
         flows=flows,
         inventory=inventory,
     )

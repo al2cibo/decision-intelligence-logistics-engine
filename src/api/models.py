@@ -28,6 +28,13 @@ class LaneRecord(BaseModel):
 
 class DestinationRecord(BaseModel):
     destination_id: str
+    holding_cost: float | None = Field(
+        default=None,
+        description=(
+            "Optional per-unit inventory holding cost. When provided for any "
+            "destination, the optimizer includes holding costs in the objective."
+        ),
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -106,6 +113,8 @@ class InventoryRecord(BaseModel):
 
 class OptimizeResponse(BaseModel):
     total_cost: float
+    transportation_cost: float
+    holding_cost: float
     flows: list[FlowRecord]
     inventory: list[InventoryRecord]
 
