@@ -19,6 +19,7 @@ dev = [
     "pytest>=9.0",
     "hypothesis>=6.0",
     "black>=24.0",
+    "httpx2>=2.7",
 ]
 
 [tool.setuptools]
